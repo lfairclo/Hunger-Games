@@ -31,6 +31,7 @@
       name,
       avatarSeed: avatarSeed || name,
       pictureData: opts.pictureData || null, // optional user-uploaded dataURL
+      pictureUrl: opts.pictureUrl || null,   // optional image picked from a GitHub folder
       alive: true,
       dayDied: null,
       causeOfDeath: null,

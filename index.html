@@ -59,6 +59,23 @@
       </div>
 
       <div class="card">
+        <h2>Portrait Source <small>pull random portraits from a folder in your GitHub repo</small></h2>
+        <p class="hint" style="margin-top:0;">If this site is on GitHub Pages, this is usually auto-detected. Point it at a folder of images (e.g. <code>avatars</code>) in your repo and new tributes will get a random one instead of a generated emblem. Leave it unset — or hit "Use generated emblems" — to skip this entirely.</p>
+        <div class="row-flex" style="margin-bottom:10px;">
+          <input type="text" id="ghOwner" placeholder="GitHub username" style="max-width:170px;">
+          <input type="text" id="ghRepo" placeholder="Repository name" style="max-width:170px;">
+          <input type="text" id="ghPath" placeholder="Folder path" value="avatars" style="max-width:140px;">
+          <input type="text" id="ghBranch" placeholder="Branch (optional)" style="max-width:150px;">
+        </div>
+        <div class="row-flex">
+          <button class="gold" id="btnLoadPortraits">Load Images From GitHub</button>
+          <button id="btnShufflePortraits">Shuffle Roster Portraits</button>
+          <button class="ghost" id="btnUseGeneratedPortraits">Use Generated Emblems</button>
+        </div>
+        <p class="hint" id="portraitStatus">No folder loaded yet — new tributes will use generated emblems.</p>
+      </div>
+
+      <div class="card">
         <h2>Game Settings</h2>
         <div class="checkline" style="margin-bottom:12px;">
           <input type="checkbox" id="teamVictoryToggle">

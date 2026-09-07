@@ -7,7 +7,7 @@
   const AV = window.HGAvatars;
 
   const app = {
-    roster: [],           // pre-game cast: {clientId, name, avatarSeed, pictureData, traits[]}
+    roster: [],           // pre-game cast: {clientId, name, avatarSeed, pictureData, pictureUrl, traits[]}
     game: null,           // live HGEngine state once started
     settings: { teamVictory: false, speed: 1400 },
     autoplayTimer: null,
@@ -15,6 +15,9 @@
     lastPhaseIndexShown: -1,
     sortKey: 'default',
     sortDir: 1,
+    imageConfig: { owner: '', repo: '', path: 'avatars', branch: '', enabled: false },
+    imagePool: [],         // shuffled queue of image URLs handed out to new tributes
+    imagePoolAll: [],      // full list fetched from the folder
   };
 
   const TYPE_ICON = {
@@ -26,7 +29,124 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function avatarSrc(entity) {
     if (entity.pictureData) return entity.pictureData;
+    if (entity.pictureUrl) return entity.pictureUrl;
     return AV.avatarDataURL(entity.avatarSeed || entity.name);
+  }
+
+  // -------------------------------------------------------------------------
+  // PORTRAIT SOURCE — pull random images from a folder in a GitHub repo via
+  // the public GitHub Contents API. Falls back to procedural emblems if the
+  // folder is missing, empty, unreachable, or the site isn't on GitHub Pages.
+  // -------------------------------------------------------------------------
+  const IMG_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
+  const IMG_CACHE_KEY = 'arenaImageConfigCache';
+
+  function guessGithubLocation() {
+    const host = window.location.hostname; // e.g. someuser.github.io
+    const m = host.match(/^([^.]+)\.github\.io$/i);
+    if (!m) return null;
+    const owner = m[1];
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    // Project pages live at username.github.io/repo/... ; user/org root pages
+    // live at username.github.io/ and are served from a repo named exactly
+    // "username.github.io".
+    const repo = segments.length ? segments[0] : `${owner}.github.io`;
+    return { owner, repo };
+  }
+
+  function shufflePool() {
+    app.imagePool = [...app.imagePoolAll].sort(() => Math.random() - 0.5);
+  }
+
+  function nextPoolImage() {
+    if (!app.imagePool.length) {
+      if (!app.imagePoolAll.length) return null;
+      shufflePool();
+    }
+    return app.imagePool.pop();
+  }
+
+  async function fetchGithubFolder(cfg) {
+    const branchQuery = cfg.branch ? `?ref=${encodeURIComponent(cfg.branch)}` : '';
+    const url = `https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${cfg.path.split('/').map(encodeURIComponent).join('/')}${branchQuery}`;
+    const res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) throw new Error(`GitHub responded ${res.status}`);
+    const items = await res.json();
+    if (!Array.isArray(items)) throw new Error('That path is not a folder');
+    return items.filter(i => i.type === 'file' && IMG_EXT.test(i.name)).map(i => i.download_url);
+  }
+
+  async function loadImagesFromGithub(cfg, opts) {
+    opts = opts || {};
+    const statusEl = document.getElementById('portraitStatus');
+    if (statusEl) statusEl.textContent = 'Checking GitHub…';
+    try {
+      const urls = await fetchGithubFolder(cfg);
+      app.imagePoolAll = urls;
+      shufflePool();
+      app.imageConfig = Object.assign({}, cfg, { enabled: urls.length > 0 });
+      localStorage.setItem(IMG_CACHE_KEY, JSON.stringify(app.imageConfig));
+      if (statusEl) {
+        statusEl.textContent = urls.length
+          ? `✓ Found ${urls.length} image${urls.length === 1 ? '' : 's'} in "${cfg.path}" — new tributes will use these.`
+          : `That folder exists but has no images in it — using generated emblems instead.`;
+      }
+      if (!opts.silent) renderRoster();
+      return urls.length > 0;
+    } catch (err) {
+      app.imageConfig = Object.assign({}, cfg, { enabled: false });
+      if (statusEl) statusEl.textContent = `Couldn't load images from GitHub (${err.message}) — using generated emblems instead.`;
+      return false;
+    }
+  }
+
+  function initPortraitSource() {
+    let cfg = { owner: '', repo: '', path: 'avatars', branch: '' };
+    try {
+      const cached = JSON.parse(localStorage.getItem(IMG_CACHE_KEY) || 'null');
+      if (cached && cached.owner) cfg = cached;
+    } catch (e) { /* ignore */ }
+    if (!cfg.owner) {
+      const guess = guessGithubLocation();
+      if (guess) cfg = Object.assign(cfg, guess);
+    }
+    document.getElementById('ghOwner').value = cfg.owner || '';
+    document.getElementById('ghRepo').value = cfg.repo || '';
+    document.getElementById('ghPath').value = cfg.path || 'avatars';
+    document.getElementById('ghBranch').value = cfg.branch || '';
+    if (cfg.owner && cfg.repo) loadImagesFromGithub(cfg, { silent: true });
+  }
+
+  document.getElementById('btnLoadPortraits').addEventListener('click', () => {
+    const cfg = {
+      owner: document.getElementById('ghOwner').value.trim(),
+      repo: document.getElementById('ghRepo').value.trim(),
+      path: document.getElementById('ghPath').value.trim() || 'avatars',
+      branch: document.getElementById('ghBranch').value.trim(),
+    };
+    if (!cfg.owner || !cfg.repo) { alert('Enter at least the GitHub username and repository name.'); return; }
+    loadImagesFromGithub(cfg);
+  });
+  document.getElementById('btnUseGeneratedPortraits').addEventListener('click', () => {
+    app.imageConfig.enabled = false;
+    app.imagePoolAll = []; app.imagePool = [];
+    document.getElementById('portraitStatus').textContent = 'Using generated emblems for new tributes.';
+    localStorage.removeItem(IMG_CACHE_KEY);
+  });
+  document.getElementById('btnShufflePortraits').addEventListener('click', () => {
+    if (!app.roster.length) return;
+    app.roster.forEach(r => assignPortrait(r, true));
+    renderRoster();
+  });
+
+  function assignPortrait(entry, force) {
+    if (!app.imageConfig.enabled && !app.imagePoolAll.length) {
+      if (force) entry.avatarSeed = entry.name + Math.random().toString(36).slice(2, 6);
+      entry.pictureUrl = null;
+      return;
+    }
+    const img = nextPoolImage();
+    if (img) entry.pictureUrl = img;
   }
 
   // -------------------------------------------------------------------------
@@ -48,13 +168,16 @@
   function addRosterEntry(name) {
     const used = new Set(app.roster.map(r => r.name));
     const finalName = name && name.trim() ? name.trim() : D.randomName(used);
-    app.roster.push({
+    const entry = {
       clientId: uid(),
       name: finalName,
       avatarSeed: finalName + Math.random().toString(36).slice(2, 6),
       pictureData: null,
+      pictureUrl: null,
       traits: D.randomTraits(2),
-    });
+    };
+    assignPortrait(entry);
+    app.roster.push(entry);
     renderRoster();
   }
 
@@ -77,8 +200,11 @@
         <td>${r.traits.map(tid => traitChip(tid)).join('')}
           <button class="small ghost" data-action="reroll">⟲</button>
         </td>
-        <td><label class="small" style="display:inline-block;"><button class="small" data-action="upload">Photo</button></label>
-          <input type="file" accept="image/*" data-action="uploadfile" style="display:none;"></td>
+        <td>
+          <button class="small" data-action="upload">Upload Photo</button>
+          <button class="small ghost" data-action="rerollPortrait" title="Pick a different random portrait">🖼⟲</button>
+          <input type="file" accept="image/*" data-action="uploadfile" style="display:none;">
+        </td>
         <td><button class="small danger ghost" data-action="remove">Remove</button></td>
       </tr>
     `).join('');
@@ -99,6 +225,10 @@
     if (e.target.dataset.action === 'remove') removeRosterEntry(id);
     else if (e.target.dataset.action === 'reroll') rerollTraits(id);
     else if (e.target.dataset.action === 'upload') tr.querySelector('[data-action=uploadfile]').click();
+    else if (e.target.dataset.action === 'rerollPortrait') {
+      const entry = app.roster.find(r => r.clientId === id);
+      if (entry) { entry.pictureData = null; assignPortrait(entry, true); renderRoster(); }
+    }
   });
   document.getElementById('rosterTable').addEventListener('change', (e) => {
     const tr = e.target.closest('tr'); if (!tr) return;
@@ -154,6 +284,7 @@
         app.roster = list.map(r => ({
           clientId: uid(), name: r.name || D.randomName(),
           avatarSeed: r.avatarSeed || r.name, pictureData: r.pictureData || null,
+          pictureUrl: r.pictureUrl || null,
           traits: (r.traits && r.traits.length) ? r.traits : D.randomTraits(2),
         }));
         if (parsed.settings) {
@@ -178,7 +309,7 @@
   function startGame() {
     if (app.roster.length < 2) { alert('Add at least 2 tributes first.'); return; }
     const rosterInput = app.roster.map(r => ({
-      name: r.name, avatarSeed: r.avatarSeed, pictureData: r.pictureData, traits: r.traits,
+      name: r.name, avatarSeed: r.avatarSeed, pictureData: r.pictureData, pictureUrl: r.pictureUrl, traits: r.traits,
     }));
     app.game = HG.createGame(rosterInput, { teamVictory: app.settings.teamVictory, arenaEventChance: 0.30, twistChance: 0.10 });
     app.lastRenderedLog = 0;
@@ -468,4 +599,7 @@
   // -------------------------------------------------------------------------
   renderRoster();
   updateMeta();
+  initPortraitSource();
+
+  window.__app = app; // exposed for debugging/testing only
 })();

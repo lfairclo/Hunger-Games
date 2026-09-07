@@ -50,16 +50,30 @@ twists entirely on their own, with any number of players.
 
 ## About the portraits
 
-There's no way for a static GitHub Pages site to "read a folder" of images
-on your computer at runtime, so instead:
+The **Portrait Source** panel in Setup can pull random portraits straight
+from a folder in this GitHub repo, using GitHub's public Contents API — no
+manifest file or build step needed:
 
-- By default, every tribute gets a unique, deterministic, procedurally
-  generated emblem (no two names look alike, and the same name always
-  generates the same emblem). This avoids relying on any external or
-  copyrighted artwork.
-- You can also click **Photo** next to any tribute in Setup to upload your
-  own picture for them. It's stored right in your roster export, so it comes
-  back if you re-import that roster later.
+- If you're viewing the site on GitHub Pages, it auto-detects your username
+  and repository. Otherwise (or to point at a different repo/branch/folder),
+  fill in the fields yourself and hit **Load Images From GitHub**.
+- Everything in the `avatars/` folder (this repo ships 16 sample emblems in
+  there already) gets pulled in as the portrait pool. Drop your own
+  `.png`/`.jpg`/`.jpeg`/`.gif`/`.webp`/`.svg` files in there — real photos,
+  fan art, whatever — commit, push, and hit **Load Images From GitHub**
+  again (or just reload the page) to pick them up.
+- New tributes are handed a random image from that pool without repeats
+  until it runs out, then it reshuffles.
+- **The repo needs to be public** for this to work — the API call is
+  unauthenticated and can't see into private repos.
+- If no folder is loaded (or the fetch fails, or you click **Use Generated
+  Emblems**), every tribute instead gets a unique, deterministic,
+  procedurally generated emblem — no two names look alike, and the same name
+  always generates the same one, so there's always a sensible fallback.
+- You can also click **Upload Photo** next to any individual tribute in Setup
+  to give them a specific picture regardless of the pool, or **🖼⟲** to draw a
+  fresh one from the pool (or a new generated emblem if there's no pool).
+  Either way, it's saved in your roster export so it comes back on import.
 
 ## Running it locally
 
@@ -69,10 +83,12 @@ layout falls back gracefully.)
 
 ## Deploying to GitHub Pages
 
-1. Create a new repository on GitHub (public or private, either works).
+1. Create a new **public** repository on GitHub (it needs to be public for
+   the automatic portrait-folder feature described below to work; everything
+   else works fine in a private repo, just without that one feature).
 2. Add all the files in this folder (`index.html`, `style.css`, `data.js`,
-   `engine.js`, `avatars.js`, `main.js`) to the root of the repository and
-   push them to your default branch.
+   `engine.js`, `avatars.js`, `main.js`, and the `avatars/` folder) to the
+   root of the repository and push them to your default branch.
 3. In the repository, go to **Settings → Pages**.
 4. Under "Build and deployment", set **Source** to "Deploy from a branch",
    pick your default branch and the `/ (root)` folder, then save.
@@ -91,6 +107,7 @@ No API keys, no backend, no build tools — it's a static site end to end.
 | `engine.js`   | The actual simulation: needs, combat, alliances, events, twists. |
 | `avatars.js`  | Procedural portrait generator.                                   |
 | `main.js`     | Wires the engine to the page — roster, game loop, rendering.     |
+| `avatars/`    | Drop portrait images here — see `avatars/README.md`.             |
 
 Feel free to open any of these and tweak the data pools (add your own
 locations, items, traits, or arena events) — everything is plain, commented
