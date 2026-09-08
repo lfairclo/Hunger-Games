@@ -5,13 +5,13 @@
 // This file is shared by host.html and watch.html.
 // ============================================================================
 window.ARENA_FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyBYbJ7pLmnMs7NaTKv_ilAnKqyLjf5mjNQ",
+  authDomain: "hunger-games-a73c7.firebaseapp.com",
+  databaseURL: "https://hunger-games-a73c7-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "hunger-games-a73c7",
+  storageBucket: "hunger-games-a73c7.firebasestorage.app",
+  messagingSenderId: "995321457774",
+  appId: "1:995321457774:web:9ab1133dd2198665c3ca7f",
 };
 
 // Where in the database this game's state lives. No need to change this
