@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PEAK — All 64 Badges</title>
+<style>
+  :root{
+    --bg:#12181f; --panel:#1a232d; --panel2:#20303c; --border:#2c3a47;
+    --text:#e7edf3; --muted:#8ea3b3; --accent:#5ec9c9; --accent2:#e8b34d;
+    --easy:#4caf7d; --medium:#e8b34d; --hard:#e07a4d; --veryhard:#d1495b;
+    --done:#233028;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    padding:0;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px;}
+  header{margin-bottom:16px;}
+  h1{
+    font-size:1.5rem;margin:0 0 4px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .subtitle{color:var(--muted);font-size:0.9rem;margin-bottom:16px;}
+
+  .progress-card{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;margin-bottom:16px;
+  }
+  .progress-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .progress-num{font-size:1.3rem;font-weight:700;color:var(--accent);}
+  .progress-bar-bg{height:10px;background:#0e151b;border-radius:6px;overflow:hidden;}
+  .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .3s ease;}
+
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+  .chip{
+    background:var(--panel);border:1px solid var(--border);color:var(--muted);
+    padding:6px 12px;border-radius:20px;font-size:0.82rem;cursor:pointer;
+    user-select:none;transition:all .15s;
+  }
+  .chip:hover{border-color:var(--accent);}
+  .chip.active{background:var(--accent);color:#08181a;border-color:var(--accent);font-weight:600;}
+  .chip.reset{margin-left:auto;color:var(--hard);border-color:var(--hard);}
+
+  .phase{margin-bottom:8px;}
+  .phase-title{
+    font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;
+    color:var(--accent2);font-weight:700;margin:22px 0 8px;
+    padding-bottom:6px;border-bottom:1px solid var(--border);
+  }
+  .phase-title span{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px;font-size:0.75rem;}
+
+  .badge-item{
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;
+    transition:background .15s,border-color .15s;
+  }
+  .badge-item.done{background:var(--done);border-color:#2f4a3a;}
+  .badge-item.hidden{display:none;}
+
+  .checkbox{
+    width:22px;height:22px;border-radius:6px;border:2px solid var(--muted);
+    flex-shrink:0;margin-top:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:all .15s;
+  }
+  .checkbox.checked{background:var(--accent);border-color:var(--accent);}
+  .checkbox svg{width:14px;height:14px;display:none;}
+  .checkbox.checked svg{display:block;}
+
+  .badge-body{flex:1;min-width:0;}
+  .badge-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+  .order-num{
+    font-size:0.72rem;color:var(--muted);font-weight:700;
+    background:#0e151b;border-radius:5px;padding:1px 6px;
+  }
+  .badge-name{font-weight:700;font-size:0.98rem;}
+  .badge-item.done .badge-name{color:var(--muted);text-decoration:line-through;}
+  .diff-tag{
+    font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;
+    padding:2px 8px;border-radius:10px;color:#08181a;
+  }
+  .diff-Easy{background:var(--easy);}
+  .diff-Medium{background:var(--medium);}
+  .diff-Hard{background:var(--hard);color:#fff;}
+  .diff-Very-Hard{background:var(--veryhard);color:#fff;}
+
+  .badge-how{font-size:0.87rem;color:#c7d3dc;line-height:1.45;}
+  .badge-item.done .badge-how{color:var(--muted);}
+  .badge-note{font-size:0.78rem;color:var(--muted);margin-top:4px;font-style:italic;}
+
+  .loading{text-align:center;color:var(--muted);padding:30px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏔️ PEAK — All 64 Badges</h1>
+    <div class="subtitle">Tap a badge to mark it done. Ordered top-to-bottom as a suggested path to 100%.</div>
+  </header>
+
+  <div class="progress-card">
+    <div class="progress-top">
+      <span>Progress</span>
+      <span class="progress-num" id="progressNum">0 / 64</span>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="controls" id="filters">
+    <div class="chip active" data-filter="all">All</div>
+    <div class="chip" data-filter="Easy">Easy</div>
+    <div class="chip" data-filter="Medium">Medium</div>
+    <div class="chip" data-filter="Hard">Hard</div>
+    <div class="chip" data-filter="Very Hard">Very Hard</div>
+    <div class="chip" data-filter="todo">Remaining only</div>
+    <div class="chip reset" id="resetBtn">Reset progress</div>
+  </div>
+
+  <div id="list"><div class="loading">Loading…</div></div>
+</div>
+
+<script>
+const DATA = [
+{p:"Natural progression — just play the route",n:"do these on your first few normal runs, no detours needed"},
+{name:"Beachcomber", diff:"Easy", how:"Simply climb past the SHORE — reach and light the campfire at the top of the first biome."},
+{name:"Trailblazer", diff:"Easy", how:"Climb past the TROPICS the same way — light the end-of-biome campfire."},
+{name:"Arborist", diff:"Easy", how:"Reach the very top of one of the really big trees in the Tropics (or the largest boughs in Roots)."},
+{name:"Nomad", diff:"Easy", how:"Climb past the MESA biome and light its campfire."},
+{name:"Volcanology", diff:"Easy", how:"Climb past the CALDERA and light its campfire."},
+{name:"Alpinist", diff:"Easy", how:"Climb past the ALPINE and light its campfire."},
+{name:"Wanderer", diff:"Easy", how:"Climb past the GLOOM and light its campfire."},
+{name:"Forestry", diff:"Easy", how:"Climb past the ROOTS and light its campfire."},
+{name:"Peak", diff:"Easy", how:"Reach The Peak biome and escape the island — granted to all living players who make it out."},
+{name:"Esoterica", diff:"Easy", how:"Pick up any mystical item from an Ancient Statue — granted the instant you grab one."},
+{name:"Bing Bong", diff:"Easy", how:"Escape the island with Bing Bong in someone's inventory. Everyone alive gets it as long as one living player is carrying him."},
+{name:"Endurance", diff:"Easy", how:"Climb 50m straight up without ever touching solid ground. Vines work great for a clean, unbroken 50m stretch."},
+
+{p:"Easy in-run pickups",n:"low effort, just remember to do them during a normal expedition"},
+{name:"Plunderer", diff:"Easy", how:"Open 15 luggages within a single expedition. Easily done if you loot everything you pass."},
+{name:"Astronomy", diff:"Easy", how:"In the MESA, pull out the Binoculars and look directly at the sun."},
+{name:"Foraging", diff:"Easy", how:"Eat 5 different types of berries in one expedition (different colors/species count separately)."},
+{name:"Mycology", diff:"Easy", how:"Eat 4 different non-toxic mushrooms in a single expedition (not Shroomberries — those are a separate badge)."},
+
+{p:"Cumulative grinds",n:"tracked across multiple expeditions, just keep playing normally"},
+{name:"Cooking", diff:"Easy", how:"Cook 20 total meals at campfires across any number of runs — anything cooked counts, edible or not."},
+{name:"Bouldering", diff:"Easy", how:"Place 10 Pitons total across your runs."},
+{name:"High Altitude", diff:"Medium", how:"Climb 5,000m total across runs (a full expedition is ~1,920m, so roughly 3 full runs)."},
+{name:"Happy Camper", diff:"Easy", how:"Receive 5 total Morale Boosts from campfires. Just sit near campfires with your team when they're lit."},
+{name:"Toxicology", diff:"Medium", how:"Restore 200 total Poison using items like Antidote, Cure-All, First Aid Kit, or Medicinal Root, across any number of runs."},
+{name:"Calcium Intake", diff:"Hard", how:"Block 100 total damage using the Fortified Milk item, tracked across expeditions — needs repeated Milk pickups and getting hit while it's active."},
+
+{p:"Co-op & support badges",n:"much easier in a full 4-player squad with a dedicated support role"},
+{name:"First Aid", diff:"Easy", how:"Heal your teammates for 100 total Injury points in a single expedition using direct healing items (Bandages, First Aid Kit, etc.)."},
+{name:"Clutch", diff:"Medium", how:"Revive 3 unconscious scouts in one expedition — reviving the same person multiple times counts each time."},
+{name:"Emergency Preparedness", diff:"Medium", how:"Use a healing item directly on an unconscious teammate to pull their total afflictions below 100 and save them from death."},
+{name:"Participation", diff:"Medium", how:"Die during an expedition and have at least one teammate escape without you. Free badge on a run where things go wrong."},
+{name:"Disaster Response", diff:"Hard", how:"Using the Rescue Claw, pull an unconscious friend a total of 30 meters in one pull."},
+{name:"Mentorship", diff:"Medium", how:"Get Scoutmaster Myres' aggro while within 40m of him — either wander 200m+ from your team, or use the Scoutmaster's Bugle to summon him."},
+
+{p:"Knowledge & exploration",n:"require finding specific things or playing a certain way"},
+{name:"Bookworm", diff:"Medium", how:"Find and read the Scoutmaster's final journal entry. Scrolls appear randomly at campfires — some entries are tied to specific biomes, so open scrolls before passing those regions."},
+{name:"Hasty", diff:"Medium", how:"Escape the island in under an hour (exactly one hour counts too). Needs a fast, efficient team run."},
+{name:"Lone Wolf", diff:"Medium", how:"Escape the island in a solo expedition — you can do this offline by yourself."},
+
+{p:"Skill & action challenges",n:"specific timed or precision actions"},
+{name:"Archery", diff:"Medium", how:"Remove 10 arrows from yourself in a single expedition — arrows from Citadel traps are the main source; anyone can remove them from you."},
+{name:"Daredevil", diff:"Medium", how:"Get launched from the Scout Cannon across the MESA canyon and land inside the target zone."},
+{name:"Needlepoint", diff:"Medium", how:"Get 5 Cactuses stuck to you at once in the MESA (this will knock you out — have a teammate ready to help, or push through solo)."},
+{name:"Megaentomology", diff:"Medium", how:"Find an antlion hill in the MESA, loot the luggage there to trigger the antlion, take a hit, then escape and survive."},
+{name:"Animal Serenading", diff:"Medium", how:"Find a Capybara (Alpine or Mesa) and play the Bugle for it."},
+{name:"Ultimate", diff:"Medium", how:"Catch a Flying Disc that's been thrown at least 100m away — works even catching it out of the fog after a long throw."},
+{name:"Mycoacrobatics", diff:"Medium", how:"Bounce 40m upward off a Bounce Fungus mushroom — stacking a Balloon float or Rescue Claw after the bounce also works."},
+{name:"Web Security", diff:"Medium", how:"Get caught in a Spider's web and escape it alive."},
+{name:"Knot Tying", diff:"Medium", how:"Place 100m of rope in a single expedition using Rope Spools, Anti-Rope Spools, or the Rope/Anti-Rope Cannons."},
+
+{p:"Food & consumption specialty",n:"specific items or eating feats"},
+{name:"Cryptogastronomy", diff:"Medium", how:"Cook a Mandrake and eat it (or have someone feed it to you)."},
+{name:"Advanced Mycology", diff:"Medium", how:"Try all 5 types of Shroomberry in one expedition — take your time searching the ROOTS biome thoroughly."},
+{name:"Gourmand", diff:"Hard", how:"Escape the island after cooking and eating a Half-Coconut, Honeycomb, Yellow Winterberry, and an Egg (each must be cooked at least once, even if burnt)."},
+{name:"Resourcefulness", diff:"Medium", how:"Either perform cannibalism, or eat a Cooked Bird as a skeleton / with cannibalism disabled."},
+{name:"Competitive Eating", diff:"Medium", how:"Eat 3 Hot Dogs within 5 seconds of each other."},
+{name:"Well Rested", diff:"Medium", how:"Find and eat The Early Worm, which spawns on the ground somewhere in the GLOOM (spot is consistent per island seed)."},
+{name:"Jester", diff:"Medium", how:"Open 2 Clown Luggages within a single expedition."},
+
+{p:"Self-imposed challenge runs",n:"best tackled as a dedicated run on easy difficulty (Tenderfoot) with a coordinated team"},
+{name:"Survivalist", diff:"Medium", how:"Escape the island without ever losing consciousness for any reason during the run."},
+{name:"Naturalist", diff:"Medium", how:"Escape without eating any packaged food — only natural food (berries, mushrooms, cooked meals, Cure-All, etc.) is allowed."},
+{name:"Balloon", diff:"Medium", how:"Escape without ever taking fall damage. Other injury sources are fine, just don't fall."},
+{name:"Tread Lightly", diff:"Medium", how:"Pass through the ROOTS while never exceeding 25% Spores."},
+{name:"Bundled Up", diff:"Medium", how:"Pass through the ALPINE while never exceeding 20% Cold."},
+{name:"Cool Cucumber", diff:"Medium", how:"Pass through the MESA while never exceeding 10% Heat."},
+{name:"Medieval History", diff:"Hard", how:"Climb past THE CITADEL without being hit by any traps — watch for arrow traps and drowsy-gas luggage traps too."},
+{name:"Leave No Trace", diff:"Hard", how:"Escape without placing any climbing gear on the mountain (no Pitons, Ropes, Cannons, Checkpoint Flags, etc.). Thrown consumables like Shelf Fungus are safe."},
+{name:"Hang Gliding", diff:"Hard", how:"Fly 100m using the Glider (found in luggage) without ever touching the ground — watch your stamina, the glider drains it."},
+
+{p:"Rare items & high-difficulty encounters",n:"depend on rare drops or riskier setups — save these for once you're comfortable"},
+{name:"Bellringer", diff:"Hard", how:"Ring 5 Belltowers in the GLOOM within a single expedition."},
+{name:"Exorcist", diff:"Hard", how:"Kill the Big Ghost that spawns in the GLOOM using a Candlestick, Faerie Lantern, Portable Stove, or a Belltower."},
+{name:"Undead Encounter", diff:"Hard", how:"Get bitten by a Zombie while at 0% Spores, then cure yourself. Zombies don't spawn on Tenderfoot, so play at least one difficulty above that for this one."},
+{name:"Last Resort", diff:"Hard", how:"Use the Ritual Dagger to heal over 75% total damage at once. It's a rare item — grab it whenever it shows up and save it for a badly hurt run."},
+{name:"Applied Esoterica", diff:"Very Hard", how:"Use the rare Book of Bones to resurrect a dead teammate (aim at their skeleton). Requires the item to spawn AND a teammate to die — coordinate this deliberately."},
+{name:"Aeronautics", diff:"Very Hard", how:"Collect 6 total Balloons (individual or from Balloon Bunches) across a run, equip all 6 at once, and float to achieve flight."},
+
+{p:"Endgame — save for last",n:"the true finale content, tackle once everything else is done"},
+{name:"24 Karat", diff:"Very Hard", how:"In the MESA, find the Tomb entrance, complete its parkour puzzle to get the Ancient Idol, then carry it (it's heavy and slows you) all the way to the Kiln or Citadel and drop it into the lava."},
+{name:"Rule Zero", diff:"Very Hard", how:"Collect the 4 amulets from Scout Statues in the first four biomes, bestow them on the Stone Scout past the Peak to transform the Strange Gem, activate Scout's Honor to teleport to Nadir, then reach the top of Nadir to trigger the true ending."},
+];
+
+const STORAGE_KEY = 'peak-badges-progress-v1';
+let state = {};
+let currentFilter = 'all';
+
+function badgeId(name){ return name.toLowerCase().replace(/[^a-z0-9]+/g,'-'); }
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    if(res && res.value){ state = JSON.parse(res.value); }
+  }catch(e){ /* no saved state yet */ }
+}
+
+async function saveState(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+  }catch(e){ console.error('save failed', e); }
+}
+
+function render(){
+  const listEl = document.getElementById('list');
+  listEl.innerHTML = '';
+  let order = 0;
+  let doneCount = 0;
+  let totalBadges = 0;
+
+  DATA.forEach(item=>{
+    if(item.p){
+      const ph = document.createElement('div');
+      ph.className = 'phase-title';
+      ph.innerHTML = item.p + (item.n ? '<span>— '+item.n+'</span>' : '');
+      listEl.appendChild(ph);
+      return;
+    }
+    order++;
+    totalBadges++;
+    const id = badgeId(item.name);
+    const isDone = !!state[id];
+    if(isDone) doneCount++;
+
+    const diffClass = 'diff-' + item.diff.replace(/\s+/g,'-');
+    let show = true;
+    if(currentFilter === 'todo' && isDone) show = false;
+    if(currentFilter !== 'all' && currentFilter !== 'todo' && item.diff !== currentFilter) show = false;
+
+    const row = document.createElement('div');
+    row.className = 'badge-item' + (isDone ? ' done' : '') + (show ? '' : ' hidden');
+    row.innerHTML = `
+      <div class="checkbox ${isDone ? 'checked':''}" data-id="${id}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#08181a" stroke-width="3"><path d="M4 12l6 6L20 6"/></svg>
+      </div>
+      <div class="badge-body">
+        <div class="badge-head">
+          <span class="order-num">#${order}</span>
+          <span class="badge-name">${item.name}</span>
+          <span class="diff-tag ${diffClass}">${item.diff}</span>
+        </div>
+        <div class="badge-how">${item.how}</div>
+      </div>
+    `;
+    listEl.appendChild(row);
+  });
+
+  document.getElementById('progressNum').textContent = doneCount + ' / ' + totalBadges;
+  document.getElementById('progressFill').style.width = (doneCount/totalBadges*100) + '%';
+
+  listEl.querySelectorAll('.checkbox').forEach(cb=>{
+    cb.addEventListener('click', async ()=>{
+      const id = cb.dataset.id;
+      state[id] = !state[id];
+      await saveState();
+      render();
+    });
+  });
+}
+
+document.getElementById('filters').addEventListener('click', (e)=>{
+  const chip = e.target.closest('.chip');
+  if(!chip || chip.id === 'resetBtn') return;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  chip.classList.add('active');
+  currentFilter = chip.dataset.filter;
+  render();
+});
+
+document.getElementById('resetBtn').addEventListener('click', async ()=>{
+  if(confirm('Reset all progress?')){
+    state = {};
+    await saveState();
+    render();
+  }
+});
+
+(async ()=>{
+  await loadState();
+  render();
+})();
+</script>
+</body>
+</html>
