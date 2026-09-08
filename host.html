@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>THE ARENA — Tribute Simulator</title>
+<title>THE ARENA — Host Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -14,7 +14,7 @@
   <nav class="sidenav">
     <div class="brand">
       <div class="brand-mark">THE <span>ARENA</span></div>
-      <div class="brand-sub">TRIBUTE SIMULATOR</div>
+      <div class="brand-sub">HOST CONSOLE</div>
     </div>
     <ul class="nav-list">
       <li class="nav-item active" data-view="setup">Setup</li>
@@ -26,6 +26,7 @@
       <div class="row"><span>Tributes</span><b id="metaTotal">0</b></div>
       <div class="row"><span>Alive</span><b id="metaAlive">0</b></div>
       <div class="row"><span>Phase</span><b id="metaPhase">—</b></div>
+      <div class="row"><span>Broadcast</span><b id="metaSync">off</b></div>
     </div>
   </nav>
 
@@ -34,7 +35,7 @@
     <!-- ===================== SETUP ===================== -->
     <section class="view active" id="view-setup">
       <h1 class="page-title">Cast the Games</h1>
-      <p class="page-sub">Build a roster of any size. Everything that happens after the gong is generated automatically — no one needs to be controlled by hand.</p>
+      <p class="page-sub">Build a roster of any size. Everything that happens after the gong is generated automatically — no one needs to be controlled by hand. This game will be broadcast live to <code>watch.html</code> as it plays. For a private, local-only game, use <code>index.html</code> instead.</p>
 
       <div class="card">
         <h2>Add Tributes</h2>
@@ -104,6 +105,17 @@
             <button id="btnRunToEnd">Run To End</button>
             <button class="ghost" id="btnResetGame">New Game</button>
           </div>
+
+          <div class="card" style="padding:14px 16px;">
+            <h2 style="font-size:13px; margin-bottom:10px;">Broadcast Message <small>shown on watchers' screens</small></h2>
+            <div class="row-flex">
+              <input type="text" id="announcementInput" placeholder="e.g. Back in 5 minutes, or a shoutout to a tribute…" style="max-width:420px;">
+              <button class="gold" id="btnSendAnnouncement">Send To Watchers</button>
+              <button class="ghost small" id="btnClearAnnouncement">Clear</button>
+            </div>
+            <p class="hint" id="announcementStatus"></p>
+          </div>
+
           <div id="winnerBannerHolder"></div>
           <div class="feed" id="feed"></div>
         </div>
@@ -164,5 +176,8 @@
 <script src="engine.js"></script>
 <script src="avatars.js"></script>
 <script src="main.js"></script>
+<script src="firebase-config.js"></script>
+<script type="module" src="firebase-client.js"></script>
+<script type="module" src="host-sync.js"></script>
 </body>
 </html>

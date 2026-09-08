@@ -15,7 +15,7 @@
     lastPhaseIndexShown: -1,
     sortKey: 'default',
     sortDir: 1,
-    imageConfig: { owner: '', repo: '', path: 'avatars', branch: '', enabled: false },
+    imageConfig: { enabled: false },
     imagePool: [],         // shuffled queue of image URLs handed out to new tributes
     imagePoolAll: [],      // full list fetched from the folder
   };
@@ -34,25 +34,12 @@
   }
 
   // -------------------------------------------------------------------------
-  // PORTRAIT SOURCE — pull random images from a folder in a GitHub repo via
-  // the public GitHub Contents API. Falls back to procedural emblems if the
-  // folder is missing, empty, unreachable, or the site isn't on GitHub Pages.
+  // PORTRAIT SOURCE — pulls random images from a fixed folder in a fixed
+  // GitHub repo via the public GitHub Contents API. Falls back to procedural
+  // emblems if the folder is missing, empty, or unreachable (e.g. offline).
   // -------------------------------------------------------------------------
   const IMG_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
-  const IMG_CACHE_KEY = 'arenaImageConfigCache';
-
-  function guessGithubLocation() {
-    const host = window.location.hostname; // e.g. someuser.github.io
-    const m = host.match(/^([^.]+)\.github\.io$/i);
-    if (!m) return null;
-    const owner = m[1];
-    const segments = window.location.pathname.split('/').filter(Boolean);
-    // Project pages live at username.github.io/repo/... ; user/org root pages
-    // live at username.github.io/ and are served from a repo named exactly
-    // "username.github.io".
-    const repo = segments.length ? segments[0] : `${owner}.github.io`;
-    return { owner, repo };
-  }
+  const GITHUB_PORTRAIT_SOURCE = { owner: 'lfairclo', repo: 'Hunger-Games', path: 'avatars', branch: '' };
 
   function shufflePool() {
     app.imagePool = [...app.imagePoolAll].sort(() => Math.random() - 0.5);
@@ -76,62 +63,38 @@
     return items.filter(i => i.type === 'file' && IMG_EXT.test(i.name)).map(i => i.download_url);
   }
 
-  async function loadImagesFromGithub(cfg, opts) {
+  async function loadImagesFromGithub(opts) {
     opts = opts || {};
+    const cfg = GITHUB_PORTRAIT_SOURCE;
     const statusEl = document.getElementById('portraitStatus');
     if (statusEl) statusEl.textContent = 'Checking GitHub…';
     try {
       const urls = await fetchGithubFolder(cfg);
       app.imagePoolAll = urls;
       shufflePool();
-      app.imageConfig = Object.assign({}, cfg, { enabled: urls.length > 0 });
-      localStorage.setItem(IMG_CACHE_KEY, JSON.stringify(app.imageConfig));
+      app.imageConfig.enabled = urls.length > 0;
       if (statusEl) {
         statusEl.textContent = urls.length
-          ? `✓ Found ${urls.length} image${urls.length === 1 ? '' : 's'} in "${cfg.path}" — new tributes will use these.`
+          ? `✓ Found ${urls.length} image${urls.length === 1 ? '' : 's'} in ${cfg.owner}/${cfg.repo}/${cfg.path} — new tributes will use these.`
           : `That folder exists but has no images in it — using generated emblems instead.`;
       }
       if (!opts.silent) renderRoster();
       return urls.length > 0;
     } catch (err) {
-      app.imageConfig = Object.assign({}, cfg, { enabled: false });
-      if (statusEl) statusEl.textContent = `Couldn't load images from GitHub (${err.message}) — using generated emblems instead.`;
+      app.imageConfig.enabled = false;
+      if (statusEl) statusEl.textContent = `Couldn't load portraits from ${cfg.owner}/${cfg.repo} (${err.message}) — using generated emblems instead.`;
       return false;
     }
   }
 
   function initPortraitSource() {
-    let cfg = { owner: '', repo: '', path: 'avatars', branch: '' };
-    try {
-      const cached = JSON.parse(localStorage.getItem(IMG_CACHE_KEY) || 'null');
-      if (cached && cached.owner) cfg = cached;
-    } catch (e) { /* ignore */ }
-    if (!cfg.owner) {
-      const guess = guessGithubLocation();
-      if (guess) cfg = Object.assign(cfg, guess);
-    }
-    document.getElementById('ghOwner').value = cfg.owner || '';
-    document.getElementById('ghRepo').value = cfg.repo || '';
-    document.getElementById('ghPath').value = cfg.path || 'avatars';
-    document.getElementById('ghBranch').value = cfg.branch || '';
-    if (cfg.owner && cfg.repo) loadImagesFromGithub(cfg, { silent: true });
+    loadImagesFromGithub({ silent: true });
   }
 
-  document.getElementById('btnLoadPortraits').addEventListener('click', () => {
-    const cfg = {
-      owner: document.getElementById('ghOwner').value.trim(),
-      repo: document.getElementById('ghRepo').value.trim(),
-      path: document.getElementById('ghPath').value.trim() || 'avatars',
-      branch: document.getElementById('ghBranch').value.trim(),
-    };
-    if (!cfg.owner || !cfg.repo) { alert('Enter at least the GitHub username and repository name.'); return; }
-    loadImagesFromGithub(cfg);
-  });
   document.getElementById('btnUseGeneratedPortraits').addEventListener('click', () => {
     app.imageConfig.enabled = false;
     app.imagePoolAll = []; app.imagePool = [];
     document.getElementById('portraitStatus').textContent = 'Using generated emblems for new tributes.';
-    localStorage.removeItem(IMG_CACHE_KEY);
   });
   document.getElementById('btnShufflePortraits').addEventListener('click', () => {
     if (!app.roster.length) return;
@@ -312,6 +275,7 @@
       name: r.name, avatarSeed: r.avatarSeed, pictureData: r.pictureData, pictureUrl: r.pictureUrl, traits: r.traits,
     }));
     app.game = HG.createGame(rosterInput, { teamVictory: app.settings.teamVictory, arenaEventChance: 0.30, twistChance: 0.10 });
+    app.game.gameId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     app.lastRenderedLog = 0;
     app.lastPhaseIndexShown = -1;
     document.getElementById('feed').innerHTML = '';
@@ -321,6 +285,7 @@
     renderNewLogEntries();
     renderRosterStrip();
     updateMeta();
+    if (window.onArenaGameUpdate) window.onArenaGameUpdate(app);
   }
 
   // -------------------------------------------------------------------------
@@ -336,6 +301,10 @@
   document.getElementById('btnResetGame').addEventListener('click', () => {
     stopAutoplay();
     if (!confirm('End this game and return to Setup? Your roster stays intact.')) return;
+    if (app.game && !app.game.ended) {
+      app.game.ended = true; // mark ended for anyone syncing/watching this game
+      if (window.onArenaGameUpdate) window.onArenaGameUpdate(app);
+    }
     app.game = null;
     switchView('setup');
   });
@@ -357,6 +326,7 @@
       stopAutoplay();
       renderWinnerBanner();
     }
+    if (window.onArenaGameUpdate) window.onArenaGameUpdate(app);
   }
 
   function runToEnd() {
@@ -369,6 +339,7 @@
     renderRosterStrip();
     updateMeta();
     if (app.game.ended) renderWinnerBanner();
+    if (window.onArenaGameUpdate) window.onArenaGameUpdate(app);
   }
 
   function toggleAutoplay() {
