@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>School Simulator: Survive the Day</title>
+<style>
+  @font-face {
+    font-family: 'PixelFallback';
+    src: local('Consolas'), local('Courier New');
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0b0b12;
+    color: #f2f2f2;
+    font-family: 'Courier New', PixelFallback, monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+  #app {
+    width: 100vw; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    position: relative;
+  }
+  #hud {
+    position: absolute; top: 10px; left: 10px; right: 10px;
+    display: flex; gap: 18px; justify-content: center;
+    z-index: 50; pointer-events: none;
+    font-size: 13px;
+  }
+  .hud-bar-wrap { width: 220px; }
+  .hud-label { display:flex; justify-content: space-between; margin-bottom: 2px; }
+  .hud-bar-bg { width: 100%; height: 16px; background: #222; border: 2px solid #555; border-radius: 3px; overflow: hidden; }
+  .hud-bar-fill { height: 100%; transition: width 0.4s ease; }
+  #wp-fill { background: linear-gradient(90deg,#ff5566,#ff8899); }
+  #int-fill { background: linear-gradient(90deg,#55aaff,#88ccff); }
+  #rep-fill { background: linear-gradient(90deg,#ffd24d,#fff2a8); }
+
+  .screen {
+    display: none;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    width: 90vw; max-width: 700px;
+    text-align: center;
+    gap: 14px;
+    animation: fadeIn 0.4s ease;
+  }
+  .screen.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform:translateY(0);} }
+
+  h1 { font-size: 2.1em; margin: 0 0 6px 0; letter-spacing: 2px; text-shadow: 0 0 10px #ff5566; }
+  h2 { margin: 0 0 6px 0; color: #ffd24d; }
+  p.desc { color: #ccc; line-height: 1.5; max-width: 600px; }
+
+  button.choice {
+    background: #16161f;
+    border: 2px solid #666;
+    color: #f2f2f2;
+    padding: 12px 20px;
+    font-family: inherit;
+    font-size: 15px;
+    cursor: pointer;
+    min-width: 260px;
+    border-radius: 4px;
+    transition: 0.15s;
+  }
+  button.choice:hover { border-color: #ffd24d; background: #26263a; transform: scale(1.03); }
+  button.choice:disabled { opacity: 0.35; cursor: not-allowed; }
+  .choice-row { display:flex; flex-direction: column; gap: 10px; align-items: center; }
+  .choice-row.horizontal { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+
+  #canvasWrap { position: relative; }
+  canvas { background: #05050a; border: 3px solid #444; border-radius: 6px; display: block; }
+  #fightOverlayText {
+    position: absolute; top: 8px; left: 0; right: 0; text-align: center;
+    color: #ffd24d; font-size: 14px; pointer-events: none; text-shadow: 0 0 4px #000;
+  }
+  #bossNamePlate {
+    position: absolute; bottom: 8px; left: 0; right: 0; text-align: center;
+    font-size: 13px; color: #ff8899; pointer-events: none;
+  }
+  .flash-red { animation: flashRed 0.3s; }
+  @keyframes flashRed { 0%{ background:#4a0010;} 100%{ background:#05050a; } }
+
+  #mcaraQ {
+    color: #ff2222;
+    font-size: 1.6em;
+    text-shadow: 0 0 12px #ff0000;
+    position: relative;
+  }
+  .drip { position:absolute; width:3px; background:#a00; opacity:0.8; animation: dripFall 2.2s linear infinite; }
+  @keyframes dripFall { 0%{ height:0; opacity:0.9;} 100%{ height:60px; opacity:0;} }
+
+  .subtle { color: #888; font-size: 12px; }
+  #timetableList { text-align:left; color:#ffd24d; font-size:13px; margin-top:6px;}
+  #logBox { max-width: 560px; color:#9be89b; font-size: 12px; min-height: 18px; }
+  #qteBox { display:flex; gap:10px; font-size: 2em; }
+  .qte-key { border:2px solid #666; padding:6px 14px; border-radius:4px; }
+  .qte-key.hit { border-color:#7CFC00; color:#7CFC00; }
+  .qte-key.miss { border-color:#ff5566; color:#ff5566; }
+  #translateInput { font-family: inherit; font-size: 18px; padding: 6px; width: 260px; text-align:center; }
+  #timerBar { width: 260px; height: 8px; background:#333; border-radius:3px; overflow:hidden; }
+  #timerFill { height:100%; background:#ff5566; width:100%; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud" style="display:none;">
+    <div class="hud-bar-wrap">
+      <div class="hud-label"><span>Willpower</span><span id="wp-text">100/100</span></div>
+      <div class="hud-bar-bg"><div id="wp-fill" class="hud-bar-fill" style="width:100%"></div></div>
+    </div>
+    <div class="hud-bar-wrap">
+      <div class="hud-label"><span>Intelligence</span><span id="int-text">50/100</span></div>
+      <div class="hud-bar-bg"><div id="int-fill" class="hud-bar-fill" style="width:50%"></div></div>
+    </div>
+    <div class="hud-bar-wrap">
+      <div class="hud-label"><span>Class Rep</span><span id="rep-text">25/50</span></div>
+      <div class="hud-bar-bg"><div id="rep-fill" class="hud-bar-fill" style="width:50%"></div></div>
+    </div>
+  </div>
+
+  <!-- TITLE -->
+  <div class="screen active" id="screen-title">
+    <h1>SCHOOL SIMULATOR</h1>
+    <p class="desc">Survive the school day. Your willpower is your life. Your intelligence is your strength.
+    Your class reputation is your armor. Do not go to Classics Society.</p>
+    <div class="choice-row">
+      <button class="choice" onclick="Game.startNewRun()">Start the Day</button>
+    </div>
+    <p class="subtle">Move: Arrow Keys / WASD &nbsp;|&nbsp; Attack: Space &nbsp;|&nbsp; Sound is synthesized in-browser</p>
+  </div>
+
+  <!-- STATS INTRO -->
+  <div class="screen" id="screen-statsintro">
+    <h2>Your Stats</h2>
+    <p class="desc">Willpower 100/100 — your HP. Hits it zero, you die of boredom.<br>
+    Intelligence 50/100 — how hard you hit back.<br>
+    Class Reputation 25/50 — your armor. At 50/50 you take half damage. Every hit you take chips it down.</p>
+    <button class="choice" onclick="Game.goAssembly()">Continue to Registration</button>
+  </div>
+
+  <!-- ASSEMBLY CHOICE -->
+  <div class="screen" id="screen-assembly">
+    <h2>Before First Period</h2>
+    <p class="desc">There's an optional assembly this morning. Sitting through it costs willpower but sharpens your mind.</p>
+    <div class="choice-row">
+      <button class="choice" onclick="Game.chooseAssembly(true)">Attend Assembly (-25% Willpower, +25% Intelligence)</button>
+      <button class="choice" onclick="Game.chooseAssembly(false)">Skip Assembly, go straight to class</button>
+    </div>
+  </div>
+
+  <!-- TIMETABLE BUILDER -->
+  <div class="screen" id="screen-timetable">
+    <h2 id="timetableHeading">Build Your Timetable</h2>
+    <p class="desc" id="timetableDesc"></p>
+    <div class="choice-row horizontal" id="timetableOptions"></div>
+    <div id="timetableList"></div>
+  </div>
+
+  <!-- LESSON INTRO -->
+  <div class="screen" id="screen-lessonintro">
+    <h2 id="lessonTitle"></h2>
+    <p class="desc" id="lessonDesc"></p>
+    <div class="choice-row">
+      <button class="choice" id="btnSit" onclick="Game.sitThroughCurrent()">Sit through the lesson</button>
+      <button class="choice" id="btnFight" onclick="Game.startFightCurrent()">Fight the teacher</button>
+    </div>
+  </div>
+
+  <!-- RESULT / LOG SCREEN -->
+  <div class="screen" id="screen-result">
+    <h2 id="resultTitle"></h2>
+    <p class="desc" id="resultDesc"></p>
+    <button class="choice" onclick="Game.continueAfterResult()">Continue</button>
+  </div>
+
+  <!-- FIGHT SCREEN -->
+  <div class="screen" id="screen-fight">
+    <div id="canvasWrap">
+      <div id="fightOverlayText"></div>
+      <canvas id="fightCanvas" width="640" height="420"></canvas>
+      <div id="bossNamePlate"></div>
+    </div>
+    <div id="logBox"></div>
+  </div>
+
+  <!-- BREAK -->
+  <div class="screen" id="screen-break">
+    <h2>Break Time</h2>
+    <p class="desc">Where do you spend break?</p>
+    <div class="choice-row">
+      <button class="choice" onclick="Game.doBreak('fields')">Football fields (+Willpower, -Intelligence, -Class Rep)</button>
+      <button class="choice" onclick="Game.doBreak('library')">Library, study (+Intelligence, -Willpower, -Class Rep)</button>
+      <button class="choice" onclick="Game.doBreak('club')">Random club (+Class Rep, -Willpower, -Intelligence)</button>
+    </div>
+  </div>
+
+  <!-- LUNCH -->
+  <div class="screen" id="screen-lunch">
+    <h2>Lunch</h2>
+    <p class="desc" id="lunchDesc">All your stats rise 25% from the food. What now?</p>
+    <div class="choice-row">
+      <button class="choice" onclick="Game.doLunch('king')">Hang out with King (+Willpower, -Intelligence)</button>
+      <button class="choice" onclick="Game.doLunch('homework')">Do homework (+Intelligence, -Willpower, -Class Rep)</button>
+    </div>
+  </div>
+
+  <!-- MCARA QUESTION -->
+  <div class="screen" id="screen-mcara" style="background:#000; width:100vw; height:100vh; max-width:none; position:fixed; top:0; left:0;">
+    <div id="mcaraQ">Will you come to Classics Society?</div>
+    <div class="choice-row horizontal">
+      <button class="choice" style="border-color:#800;" onclick="Game.mcaraChoice('go')">Go to Classics Society</button>
+      <button class="choice" style="border-color:#800;" onclick="Game.mcaraChoice('run')">RUN</button>
+    </div>
+  </div>
+
+  <!-- CLASSICS DEATH -->
+  <div class="screen" id="screen-classicsdeath" style="background:#000;">
+    <p class="desc" id="classicsText" style="color:#ff4444;"></p>
+  </div>
+
+  <!-- CHASE -->
+  <div class="screen" id="screen-chase">
+    <div id="canvasWrap">
+      <div id="fightOverlayText">RUN. Dodge left/right. Survive 30 seconds.</div>
+      <canvas id="chaseCanvas" width="640" height="420"></canvas>
+    </div>
+  </div>
+
+  <!-- QTE (english cycling / translation) -->
+  <div class="screen" id="screen-qte">
+    <h2 id="qteTitle"></h2>
+    <div id="qteBox"></div>
+    <div id="timerBar"><div id="timerFill"></div></div>
+    <input id="translateInput" style="display:none;" autocomplete="off" placeholder="Type the English translation...">
+  </div>
+
+  <!-- DEATH -->
+  <div class="screen" id="screen-death">
+    <h1 style="color:#ff5566;">YOU DIED OF BOREDOM</h1>
+    <p class="desc" id="deathReason"></p>
+    <div class="choice-row">
+      <button class="choice" onclick="Game.startNewRun()">Restart the Day</button>
+      <button class="choice" onclick="Game.becomeActor()">Become an Actor Instead</button>
+    </div>
+  </div>
+
+  <!-- ACTOR ENDING -->
+  <div class="screen" id="screen-actor">
+    <h1 style="color:#ffd24d;">YOU BECOME AN ACTOR</h1>
+    <p class="desc">You drop out of the education system entirely and pursue the stage. Somewhere, Mr McAra sighs with relief. THE END.</p>
+    <button class="choice" onclick="Game.startNewRun()">Play Again</button>
+  </div>
+
+  <!-- WIN -->
+  <div class="screen" id="screen-win">
+    <h1 style="color:#7CFC00;">YOU SURVIVED THE SCHOOL DAY</h1>
+    <p class="desc" id="winDesc"></p>
+    <button class="choice" onclick="Game.startNewRun()">Play Again</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   AUDIO — tiny synthesized SFX, no external files needed
+   ========================================================= */
+const Sfx = (() => {
+  let ctx = null;
+  function ac() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
+  function tone(freq, dur, type='sine', vol=0.15, startDelay=0) {
+    try {
+      const c = ac();
+      const t0 = c.currentTime + startDelay;
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+      gain.gain.setValueAtTime(vol, t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      osc.connect(gain); gain.connect(c.destination);
+      osc.start(t0); osc.stop(t0 + dur);
+    } catch(e) {}
+  }
+  function noise(dur=0.15, vol=0.12) {
+    try {
+      const c = ac();
+      const bufferSize = c.sampleRate * dur;
+      const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i=0;i<bufferSize;i++) data[i] = (Math.random()*2-1) * (1 - i/bufferSize);
+      const src = c.createBufferSource(); src.buffer = buffer;
+      const gain = c.createGain(); gain.gain.value = vol;
+      src.connect(gain); gain.connect(c.destination);
+      src.start();
+    } catch(e) {}
+  }
+  return {
+    select: () => tone(440, 0.08, 'square', 0.08),
+    hit: () => { tone(120, 0.15, 'sawtooth', 0.18); noise(0.1, 0.1); },
+    playerAttack: () => tone(660, 0.08, 'square', 0.1),
+    detention: () => { tone(200,0.3,'sawtooth',0.15); tone(150,0.4,'sawtooth',0.12,0.15); },
+    bossDefeat: () => { [523,659,784,1046].forEach((f,i)=>tone(f,0.18,'triangle',0.15,i*0.12)); },
+    death: () => { [400,320,240,160,80].forEach((f,i)=>tone(f,0.35,'sawtooth',0.15,i*0.18)); },
+    win: () => { [523,659,784,1046,1318].forEach((f,i)=>tone(f,0.22,'triangle',0.15,i*0.11)); },
+    stun: () => tone(90, 0.4, 'square', 0.15),
+    tick: () => tone(880,0.03,'square',0.05),
+  };
+})();
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const S = {
+  wp: 100, maxWp: 100,
+  int: 50, maxInt: 100,
+  rep: 25, maxRep: 50,
+  detentionFlag: false,
+  timetable: [],      // ['chemistry','physics',...] chosen for periods before/after break
+  currentPeriodIndex: 0,
+  currentSubject: null,
+  pendingAfterResult: null,
+};
+
+const SUBJECT_POOL = ['chemistry','physics','maths','english'];
+
+const SUBJECTS = {
+  chemistry: {
+    name: 'Chemistry', teacher: 'Mr Edwards', color: '#7CFC00',
+    sitDesc: 'Sit through 5 minutes of Mr Edwards droning on.',
+    sit: { wp: -20, int: +5, detentionChance: 0.10 },
+    fight: { hp: 90, difficulty: 'Easy-Moderate',
+      onHit: (game) => { S.detentionFlag = true; },
+      patterns: ['beakerLob'] }
+  },
+  physics: {
+    name: 'Physics', teacher: 'Mr Burke', color: '#55aaff',
+    sitDesc: 'Sit through Mr Burke\'s lecture.',
+    sit: { int: -25, wp: +10 },
+    fight: { hp: 100, difficulty: 'Easy',
+      patterns: ['spinningRuler','fallingRocks'] }
+  },
+  maths: {
+    name: 'Maths', teacher: 'Ms Root', color: '#ffd24d',
+    sitDesc: 'Sit through Ms Root\'s lesson.',
+    sit: { int: +10, wp: -40, detentionChance: 0.25 },
+    fight: { hp: 130, difficulty: 'Moderate-Hard', passiveDrain: true,
+      patterns: ['laserSweep','whiteboardThrow'] }
+  },
+  english: {
+    name: 'English', teacher: 'Mr Mee', color: '#ff88cc',
+    sitDesc: 'Skip your usual routine — Mr Mee is unpredictable.',
+    sit: { random: true },
+    fight: { hp: 1, difficulty: 'Moderate', isMinigame: 'cycling' }
+  },
+};
+
+/* =========================================================
+   UTIL
+   ========================================================= */
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function pct(stat) { return { wp:'maxWp', int:'maxInt', rep:'maxRep' }[stat]; }
+function applyPercent(stat, percent) {
+  const maxKey = pct(stat);
+  const delta = (percent/100) * S[maxKey];
+  S[stat] = clamp(S[stat] + delta, 0, S[maxKey]);
+  updateHud();
+}
+function applyClassRepHitPenalty() {
+  const twenty = S.maxRep * 0.2;
+  if (S.rep < twenty) S.rep = 0; else S.rep -= twenty;
+  updateHud();
+}
+function damageReductionPercent() {
+  return clamp((S.rep / S.maxRep) * 50, 0, 50);
+}
+function takeDamage(baseDamage) {
+  const reduced = baseDamage * (1 - damageReductionPercent()/100);
+  S.wp = clamp(S.wp - reduced, 0, S.maxWp);
+  applyClassRepHitPenalty();
+  updateHud();
+  Sfx.hit();
+  flashScreen();
+  return reduced;
+}
+function playerAttackDamage() {
+  return 4 + S.int * 0.18;
+}
+function updateHud() {
+  document.getElementById('wp-text').textContent = `${Math.round(S.wp)}/${S.maxWp}`;
+  document.getElementById('int-text').textContent = `${Math.round(S.int)}/${S.maxInt}`;
+  document.getElementById('rep-text').textContent = `${Math.round(S.rep)}/${S.maxRep}`;
+  document.getElementById('wp-fill').style.width = (S.wp/S.maxWp*100)+'%';
+  document.getElementById('int-fill').style.width = (S.int/S.maxInt*100)+'%';
+  document.getElementById('rep-fill').style.width = (S.rep/S.maxRep*100)+'%';
+  if (S.wp <= 0) { setTimeout(()=>Game.die('Your willpower ran out.'), 50); }
+}
+function flashScreen() {
+  const app = document.getElementById('app');
+  app.classList.remove('flash-red'); void app.offsetWidth; app.classList.add('flash-red');
+}
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('hud').style.display = (id==='screen-title') ? 'none' : 'flex';
+}
+
+/* =========================================================
+   GENERIC BULLET-HELL FIGHT ENGINE
+   ========================================================= */
+class Fight {
+  constructor(canvasId, config) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.config = config; // {bossName, color, hp, maxHp (or list of subBosses), patterns:[fns], onEnd(win)}
+    this.player = { x: this.canvas.width/2, y: this.canvas.height-40, w:16, h:16, speed: 220, facingAngle:-Math.PI/2, swingUntil:0 };
+    this.bullets = [];
+    this.keys = {};
+    this.running = false;
+    this.lastAttack = -99;
+    this.attackCooldown = config.attackCooldown || 0.55;
+    this.attackRange = config.attackRange || 58;
+    this.t = 0;
+    this.timers = [];
+    this.qtePhaseActive = false;
+    this.bosses = config.bosses || [{ name: config.bossName, hp: config.hp, maxHp: config.hp, color: config.color }];
+    this.bosses.forEach(b => { b.baseX = b.x; b.baseY = b.y; });
+    this._keydown = (e) => this.keys[e.key.toLowerCase()] = true;
+    this._keyup = (e) => this.keys[e.key.toLowerCase()] = false;
+  }
+  start() {
+    this.running = true;
+    window.addEventListener('keydown', this._keydown);
+    window.addEventListener('keyup', this._keyup);
+    document.getElementById('bossNamePlate').textContent =
+      this.bosses.map(b=>b.name).join(' + ') + `  —  Difficulty: ${this.config.difficulty||''}`;
+    document.getElementById('fightOverlayText').textContent = this.config.instructions || 'Move close and press Space to swing your sword';
+    this.config.patternFns.forEach(fn => fn(this));
+    if (this.config.passiveDrain) {
+      this.timers.push(setInterval(()=>{
+        applyPercent('wp', -1); applyPercent('int', +1);
+      }, 1000));
+    }
+    this.last = performance.now();
+    requestAnimationFrame((ts)=>this.loop(ts));
+  }
+  pause() { this.running = false; }
+  resume() { if (this.finished) return; this.running = true; this.last = performance.now(); requestAnimationFrame((ts)=>this.loop(ts)); }
+  addTimer(id) { this.timers.push(id); }
+  spawnBullet(b) { this.bullets.push(Object.assign({born:this.t, r:8, reactionCheck:true}, b)); }
+  loop(ts) {
+    if (!this.running) return;
+    const dt = Math.min(0.033, (ts-this.last)/1000);
+    this.last = ts; this.t += dt;
+    this.update(dt);
+    this.draw();
+    if (this.running) requestAnimationFrame((ts2)=>this.loop(ts2));
+  }
+  aliveBosses() { return this.bosses.filter(b=>b.hp>0); }
+  nearestBoss() {
+    const alive = this.aliveBosses();
+    if (!alive.length) return null;
+    const p = this.player;
+    return alive.sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];
+  }
+  update(dt) {
+    const p = this.player;
+    {
+      let dx=0, dy=0;
+      if (this.keys['arrowleft']||this.keys['a']) dx-=1;
+      if (this.keys['arrowright']||this.keys['d']) dx+=1;
+      if (this.keys['arrowup']||this.keys['w']) dy-=1;
+      if (this.keys['arrowdown']||this.keys['s']) dy+=1;
+      const len = Math.hypot(dx,dy)||1;
+      p.x = clamp(p.x + (dx/len)*p.speed*dt, 10, this.canvas.width-10);
+      p.y = clamp(p.y + (dy/len)*p.speed*dt, 10, this.canvas.height-10);
+      if (this.keys[' '] && (this.t - this.lastAttack) >= this.attackCooldown) {
+        this.lastAttack = this.t;
+        this.doAttack();
+      }
+    }
+    // boss movement patterns
+    for (const b of this.bosses) { if (b.hp>0 && b.moveFn) b.moveFn(b, this.t); }
+    // keep sword pointed at nearest living boss even when idle
+    const near = this.nearestBoss();
+    if (near) p.facingAngle = Math.atan2(near.y-p.y, near.x-p.x);
+    // update bullets
+    for (const b of this.bullets) {
+      if (b.update) b.update(b, dt, this);
+    }
+    this.bullets = this.bullets.filter(b => !b.dead && this.t - b.born < (b.life||8));
+    // collisions
+    for (const b of this.bullets) {
+      if (b.hitDone) continue;
+      const dx = b.x - p.x, dy = b.y - p.y;
+      if (Math.hypot(dx,dy) < (b.r + 9)) {
+        b.hitDone = true;
+        if (b.pierce) { /* stays alive */ } else b.dead = true;
+        if (this.qtePhaseActive && b.reactionCheck !== false) {
+          this.pause();
+          Game.triggerReactionQTE(this, b.damage||8, b.effect);
+          break;
+        } else {
+          takeDamage(b.damage||8);
+          if (b.effect) b.effect(this);
+        }
+      }
+    }
+    if (S.wp <= 0) this.finish(false);
+  }
+  doAttack() {
+    Sfx.playerAttack();
+    const p = this.player;
+    p.swingUntil = this.t + 0.22;
+    const target = this.nearestBoss();
+    if (!target) return;
+    p.facingAngle = Math.atan2(target.y-p.y, target.x-p.x);
+    const dist = Math.hypot(target.x-p.x, target.y-p.y);
+    if (dist > this.attackRange) return; // too far — whiffs, still on cooldown
+    const dmg = playerAttackDamage();
+    target.hp = clamp(target.hp - dmg, 0, target.maxHp);
+    target.flashUntil = this.t + 0.1;
+    if (target.hp <= 0 && !target.defeatedHandled) {
+      target.defeatedHandled = true;
+      Sfx.bossDefeat();
+      if (this.config.onSubBossDefeat) this.config.onSubBossDefeat(this, target);
+    }
+    if (this.bosses.every(b=>b.hp<=0)) {
+      this.finish(true);
+    }
+  }
+  finish(win) {
+    if (this.finished) return;
+    this.finished = true;
+    this.running = false;
+    this.timers.forEach(id => clearInterval(id));
+    window.removeEventListener('keydown', this._keydown);
+    window.removeEventListener('keyup', this._keyup);
+    if (this.config.onEnd) this.config.onEnd(win);
+  }
+  draw() {
+    const ctx = this.ctx, W=this.canvas.width, H=this.canvas.height;
+    ctx.clearRect(0,0,W,H);
+    // boss hp bars, centered top
+    const barX = (W-220)/2;
+    let by = 14;
+    for (const b of this.bosses) {
+      ctx.fillStyle = '#333'; ctx.fillRect(barX, by, 200, 10);
+      ctx.fillStyle = b.color || '#ff5566';
+      ctx.fillRect(barX, by, 200*(b.hp/b.maxHp), 10);
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+      ctx.fillText(b.name, barX, by-2);
+      by += 22;
+      if (b.x!=null) {
+        ctx.fillStyle = (this.t < b.flashUntil) ? '#fff' : (b.color||'#ff5566');
+        ctx.beginPath(); ctx.arc(b.x, b.y, 20, 0, Math.PI*2); ctx.fill();
+      }
+    }
+    // bullets
+    for (const b of this.bullets) {
+      ctx.fillStyle = b.color || '#ff8899';
+      if (b.shape === 'line') {
+        ctx.strokeStyle = b.color || '#ff8899'; ctx.lineWidth = b.w||4;
+        ctx.beginPath(); ctx.moveTo(b.x1,b.y1); ctx.lineTo(b.x2,b.y2); ctx.stroke();
+      } else if (b.shape === 'rect') {
+        ctx.fillRect(b.x-b.w/2, b.y-b.h/2, b.w, b.h);
+      } else {
+        ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
+      }
+    }
+    // player
+    const p = this.player;
+    ctx.fillStyle = '#ffd24d';
+    ctx.fillRect(p.x-8, p.y-8, 16, 16);
+    // sword — always points at nearest boss, swings on attack
+    const swinging = this.t < p.swingUntil;
+    let swingArc = 0;
+    if (swinging) {
+      const progress = 1 - (p.swingUntil - this.t)/0.22;
+      swingArc = Math.sin(progress*Math.PI) * 1.1 - 0.5;
+    }
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.facingAngle + swingArc);
+    ctx.strokeStyle = swinging ? '#ffffff' : '#bbbbbb';
+    ctx.lineWidth = swinging ? 5 : 3;
+    ctx.beginPath(); ctx.moveTo(9,0); ctx.lineTo(9+26+(swinging?12:0), 0); ctx.stroke();
+    ctx.fillStyle = '#8a6a3a'; ctx.fillRect(3,-3,7,6);
+    ctx.restore();
+    // range indicator ring (subtle)
+    ctx.strokeStyle = 'rgba(255,210,77,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(p.x, p.y, this.attackRange, 0, Math.PI*2); ctx.stroke();
+    // attack cooldown bar under player
+    const cdRatio = clamp((this.t-this.lastAttack)/this.attackCooldown, 0, 1);
+    ctx.fillStyle = '#222'; ctx.fillRect(p.x-14, p.y+16, 28, 5);
+    ctx.fillStyle = cdRatio>=1 ? '#7CFC00' : '#ff8899';
+    ctx.fillRect(p.x-14, p.y+16, 28*cdRatio, 5);
+  }
+}
+
+
+/* --- Boss attack pattern generators --- */
+function pat_beakerLob(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    fight.spawnBullet({
+      x: fight.canvas.width/2, y: 60, r: 9, color:'#7CFC00', damage: 10,
+      vx: (Math.random()-0.5)*140, vy: 160,
+      update(b,dt){ b.x+=b.vx*dt; b.y+=b.vy*dt; if (b.y>420||b.x<0||b.x>640) b.dead=true; },
+      effect: (f) => { if (fight.config.onHit) fight.config.onHit(f); }
+    });
+  }, 900));
+}
+function pat_spinningRuler(fight) {
+  let angle = 0;
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    angle += 0.5;
+    const cx=320, cy=210, len=170;
+    fight.spawnBullet({
+      x: cx+Math.cos(angle)*len, y: cy+Math.sin(angle)*len, r:10, color:'#55aaff', damage:9, life:0.12,
+      update(b,dt){ b.life-=dt; if(b.life<=0)b.dead=true; }
+    });
+  }, 60));
+}
+function pat_fallingRocks(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    fight.spawnBullet({
+      x: Math.random()*600+20, y: -10, r: 13, color:'#8899aa', damage: 7, vy: 130,
+      update(b,dt){ b.y+=b.vy*dt; if (b.y>440) b.dead=true; },
+      effect: (f) => { applyPercent('rep', -8); applyPercent('int', -8); }
+    });
+  }, 1100));
+}
+function pat_laserSweep(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    const vertical = Math.random()<0.5;
+    let x=0;
+    const id = setInterval(()=>{
+      if (!fight.running) { clearInterval(id); return; }
+      x += 40;
+      fight.spawnBullet({
+        shape:'line', x1: vertical? x:0, y1: vertical?0:x, x2: vertical? x:640, y2: vertical?420:x,
+        r:6, w:5, color:'#ffd24d', damage: 12, life:0.15,
+        update(b,dt){ b.life-=dt; if(b.life<=0) b.dead=true; }
+      });
+      if (x>640) clearInterval(id);
+    }, 40);
+  }, 2600));
+}
+function pat_whiteboardThrow(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    fight.spawnBullet({
+      x: 60+Math.random()*520, y: -10, r:11, color:'#eeeeee', damage: 8, vy: 190,
+      shape:'rect', w:22, h:16,
+      update(b,dt){ b.y+=b.vy*dt; if(b.y>440) b.dead=true; }
+    });
+  }, 500));
+}
+function pat_hockeyFlick(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    const boss = fight.bosses[0];
+    fight.spawnBullet({
+      x: boss.x, y: boss.y, r: 8, color:'#ffffff', damage: 11,
+      vx: (fight.player.x-boss.x)/0.8, vy: (fight.player.y-boss.y)/0.8,
+      update(b,dt){ b.x+=b.vx*dt; b.y+=b.vy*dt; if(b.x<0||b.x>640||b.y<0||b.y>420) b.dead=true; },
+      effect: () => { applyClassRepHitPenalty(); } // double class rep hit
+    });
+  }, 750));
+}
+function pat_bioAttack(kind) {
+  return function(fight) {
+    const boss = fight.bosses.find(b=>b.key===kind);
+    fight.addTimer(setInterval(()=>{
+      if (!fight.running || boss.hp<=0) return;
+      const aimx = fight.player.x - boss.x, aimy = fight.player.y - boss.y;
+      const ang = Math.atan2(aimy, aimx);
+      if (kind==='kirsten') {
+        // three-bullet spread — extra sharp sting instead of a stun
+        [-0.28, 0, 0.28].forEach(off => {
+          const a = ang + off;
+          fight.spawnBullet({x:boss.x,y:boss.y,r:8,color:'#cc88ff',damage:9,
+            vx:Math.cos(a)*150, vy:Math.sin(a)*150,
+            update(b,dt){b.x+=b.vx*dt;b.y+=b.vy*dt; if(b.x<0||b.x>640||b.y<0||b.y>420)b.dead=true;}});
+        });
+      } else if (kind==='lau') {
+        // slow heavy orb, gently tracks the player — hits your class rep hard
+        fight.spawnBullet({x:boss.x,y:boss.y,r:14,color:'#ff99cc',damage:5,
+          vx:Math.cos(ang)*70, vy:Math.sin(ang)*70,
+          update(b,dt){
+            const a2 = Math.atan2(fight.player.y-b.y, fight.player.x-b.x);
+            b.vx += Math.cos(a2)*40*dt; b.vy += Math.sin(a2)*40*dt;
+            b.x+=b.vx*dt;b.y+=b.vy*dt; if(b.x<0||b.x>640||b.y<0||b.y>420)b.dead=true;
+          },
+          effect:()=>{ applyClassRepHitPenalty(); }});
+      } else if (kind==='maan') {
+        // zigzagging bolt — drains intelligence
+        fight.spawnBullet({x:boss.x,y:boss.y,r:8,color:'#99ccff',damage:4,
+          baseAng: ang, born2:fight.t,
+          update(b,dt){
+            const wob = Math.sin((fight.t-b.born2)*10)*90;
+            b.x += (Math.cos(b.baseAng)*160)*dt + Math.cos(b.baseAng+Math.PI/2)*wob*dt;
+            b.y += (Math.sin(b.baseAng)*160)*dt + Math.sin(b.baseAng+Math.PI/2)*wob*dt;
+            if(b.x<0||b.x>640||b.y<0||b.y>420)b.dead=true;
+          },
+          effect:()=>applyPercent('int',-8)});
+      } else if (kind==='potter') {
+        // fast straight lance — heaviest willpower damage
+        fight.spawnBullet({x:boss.x,y:boss.y,r:10,color:'#ffcc66',damage:13,
+          vx:Math.cos(ang)*260, vy:Math.sin(ang)*260,
+          update(b,dt){b.x+=b.vx*dt;b.y+=b.vy*dt; if(b.x<0||b.x>640||b.y<0||b.y>420)b.dead=true;}});
+      }
+    }, 1300 + Math.random()*400));
+  };
+}
+function pat_mcaraTextbooks(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    const boss = fight.bosses[0];
+    fight.spawnBullet({
+      x: boss.x, y: boss.y, r:12, color:'#c9a86a', damage: 10, reactionCheck:false,
+      vx:(fight.player.x-boss.x)*0.7, vy:(fight.player.y-boss.y)*0.7,
+      update(b,dt){b.x+=b.vx*dt;b.y+=b.vy*dt; if(b.x<0||b.x>640||b.y<0||b.y>420)b.dead=true;},
+      effect: () => { Game.triggerLatinQTE(); }
+    });
+  }, fight.config.textbookInterval || 1600));
+}
+function pat_pensFromGround(fight) {
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    for (let i=0;i<3;i++) {
+      fight.spawnBullet({
+        x: 40+Math.random()*560, y: 400, r:6, color:'#333', damage: 6, vy:-160, life:1.4,
+        update(b,dt){ b.y+=b.vy*dt; b.life-=dt; if(b.life<=0) b.dead=true; }
+      });
+    }
+  }, 1300));
+}
+function pat_spinningArms(fight) {
+  let angle=0;
+  fight.addTimer(setInterval(()=>{
+    if (!fight.running) return;
+    angle += 0.35;
+    const cx=320, cy=210, len=220;
+    fight.spawnBullet({
+      x: cx+Math.cos(angle)*len, y: cy+Math.sin(angle)*len, r:14, color:'#8b0000', damage: 14, life:0.1,
+      update(b,dt){ b.life-=dt; if(b.life<=0)b.dead=true; }
+    });
+    fight.spawnBullet({
+      x: cx-Math.cos(angle)*len, y: cy-Math.sin(angle)*len, r:14, color:'#8b0000', damage: 14, life:0.1,
+      update(b,dt){ b.life-=dt; if(b.life<=0)b.dead=true; }
+    });
+  }, 60));
+}
+
+/* =========================================================
+   GAME FLOW CONTROLLER
+   ========================================================= */
+const Game = {
+  startNewRun() {
+    Object.assign(S, { wp:100, maxWp:100, int:50, maxInt:100, rep:25, maxRep:50,
+      detentionFlag:false, timetable:[], currentPeriodIndex:0, currentSubject:null });
+    this._lastStepForPicks = null;
+    updateHud();
+    showScreen('screen-statsintro');
+  },
+  goAssembly() { showScreen('screen-assembly'); },
+  chooseAssembly(attend) {
+    Sfx.select();
+    if (attend) { applyPercent('wp', -25); applyPercent('int', +25); }
+    this.beginTimetableStep('period1');
+  },
+  beginTimetableStep(step) {
+    this._ttStep = step;
+    const opts = document.getElementById('timetableOptions');
+    opts.innerHTML = '';
+    const already = S.timetable;
+    const remaining = SUBJECT_POOL.filter(s => !already.includes(s));
+    document.getElementById('timetableHeading').textContent =
+      step==='period1' ? 'Period 1 (before break)' : 'Periods 2 & 3 (after break, before lunch)';
+    document.getElementById('timetableDesc').textContent =
+      step==='period1' ? 'Choose one subject.' : 'Choose two subjects.';
+    document.getElementById('timetableList').innerHTML =
+      'Timetable so far: ' + (S.timetable.map(s=>SUBJECTS[s].name).join(', ') || '(none yet)');
+    // Only (re)initialize the pick counter the first time we enter this step,
+    // not every time the screen re-renders after a pick (that was the bug).
+    if (this._lastStepForPicks !== step) {
+      this._picksNeeded = step==='period1' ? 1 : 2;
+      this._picksMade = 0;
+      this._lastStepForPicks = step;
+    }
+    remaining.forEach(key => {
+      const b = document.createElement('button');
+      b.className = 'choice'; b.textContent = SUBJECTS[key].name + ' — ' + SUBJECTS[key].teacher;
+      b.onclick = () => this.pickSubject(key, step);
+      opts.appendChild(b);
+    });
+    showScreen('screen-timetable');
+  },
+  pickSubject(key, step) {
+    Sfx.select();
+    S.timetable.push(key);
+    this._picksMade++;
+    if (this._picksMade < this._picksNeeded) {
+      this.beginTimetableStep(step);
+      return;
+    }
+    if (step === 'period1') {
+      // move to break, will return to pick periods 2&3 after
+      this._afterBreakNext = true;
+      this.doBreakScreen();
+    } else {
+      this.runLessonQueueAfterBreak();
+    }
+  },
+  doBreakScreen() { showScreen('screen-break'); },
+  doBreak(choice) {
+    Sfx.select();
+    if (choice==='fields') { applyPercent('wp', +20); applyPercent('int', -15); applyPercent('rep', -15); }
+    if (choice==='library') { applyPercent('int', +20); applyPercent('wp', -15); applyPercent('rep', -10); }
+    if (choice==='club') { applyPercent('rep', +20); applyPercent('wp', -15); applyPercent('int', -10); }
+    // now go run period 1 lesson (chosen before break), THEN come back for period 2&3 selection
+    this._lessonQueue = [S.timetable[0]];
+    this._afterLessonQueue = () => this.beginTimetableStep('periods23');
+    this.runNextLesson();
+  },
+  runLessonQueueAfterBreak() {
+    this._lessonQueue = [S.timetable[1], S.timetable[2]];
+    this._afterLessonQueue = () => this.enterLunch();
+    this.runNextLesson();
+  },
+  runNextLesson() {
+    if (this._lessonQueue.length === 0) { this._afterLessonQueue(); return; }
+    const key = this._lessonQueue.shift();
+    S.currentSubject = key;
+    const subj = SUBJECTS[key];
+    document.getElementById('lessonTitle').textContent = subj.name + ' — ' + subj.teacher;
+    document.getElementById('lessonDesc').textContent = subj.sitDesc + `  (Fight difficulty: ${subj.fight.difficulty})`;
+    showScreen('screen-lessonintro');
+  },
+  sitThroughCurrent() {
+    Sfx.select();
+    const key = S.currentSubject; const subj = SUBJECTS[key];
+    let msg = '';
+    if (subj.sit.random) {
+      const stats = ['wp','int','rep'];
+      let lines = [];
+      stats.forEach(st => {
+        const up = Math.random() < 0.5;
+        const val = up ? 30 : -40;
+        applyPercent(st, val);
+        lines.push(`${st.toUpperCase()} ${up?'+30%':'-40%'}`);
+      });
+      msg = 'Mr Mee\'s class is chaos. ' + lines.join(', ') + '.';
+    } else {
+      if (subj.sit.wp) applyPercent('wp', subj.sit.wp);
+      if (subj.sit.int) applyPercent('int', subj.sit.int);
+      msg = `You sat through ${subj.name}. `;
+      if (subj.sit.wp) msg += `Willpower ${subj.sit.wp>0?'+':''}${subj.sit.wp}%. `;
+      if (subj.sit.int) msg += `Intelligence ${subj.sit.int>0?'+':''}${subj.sit.int}%. `;
+      if (subj.sit.detentionChance && Math.random() < subj.sit.detentionChance) {
+        applyPercent('wp', -10);
+        msg += ' You got a detention! (-10% extra willpower)';
+        Sfx.detention();
+      }
+    }
+    this.showResult('Lesson Over', msg, () => this.runNextLesson());
+  },
+  startFightCurrent() {
+    const key = S.currentSubject; const subj = SUBJECTS[key];
+    if (subj.fight.isMinigame === 'cycling') { this.startCyclingMinigame(); return; }
+    showScreen('screen-fight');
+    const fight = new Fight('fightCanvas', {
+      bossName: subj.name + ' (' + subj.teacher + ')',
+      color: subj.color, hp: subj.fight.hp, difficulty: subj.fight.difficulty,
+      patternFns: subj.fight.patterns.map(p => ({beakerLob:pat_beakerLob, spinningRuler:pat_spinningRuler,
+        fallingRocks:pat_fallingRocks, laserSweep:pat_laserSweep, whiteboardThrow:pat_whiteboardThrow}[p])),
+      passiveDrain: !!subj.fight.passiveDrain,
+      onHit: subj.fight.onHit,
+      onEnd: (win) => {
+        if (win) {
+          this.showResult('Victory!', `You defeated ${subj.teacher}!`, () => this.runNextLesson());
+        } else {
+          this.die(`${subj.teacher} got the better of you.`);
+        }
+      }
+    });
+    fight.bosses[0].x = 320; fight.bosses[0].y = 100;
+    fight.start();
+  },
+  startCyclingMinigame() {
+    showScreen('screen-qte');
+    document.getElementById('qteTitle').textContent = 'Mr Mee\'s Cycling Track — press the arrow shown!';
+    const box = document.getElementById('qteBox');
+    const input = document.getElementById('translateInput');
+    input.style.display = 'none';
+    const dirs = ['←','↑','→','↓'];
+    let round = 0, hits = 0;
+    const total = 8;
+    function renderRound() {
+      box.innerHTML = '';
+      const d = dirs[Math.floor(Math.random()*4)];
+      box.dataset.target = d;
+      const el = document.createElement('div'); el.className='qte-key'; el.textContent = d;
+      box.appendChild(el);
+    }
+    renderRound();
+    const timerFill = document.getElementById('timerFill');
+    let timeLeft = 1.1;
+    function tick() {
+      timeLeft -= 0.03;
+      timerFill.style.width = Math.max(0,(timeLeft/1.1*100))+'%';
+      if (timeLeft <= 0) { fail(); }
+    }
+    const map = {'arrowleft':'←','arrowup':'↑','arrowright':'→','arrowdown':'↓'};
+    let interval = setInterval(tick, 30);
+    function fail() {
+      round++;
+      if (round>=total) return finish();
+      timeLeft=1.1; renderRound();
+    }
+    function handler(e) {
+      const k = map[e.key.toLowerCase()];
+      if (!k) return;
+      if (k === box.dataset.target) { hits++; box.firstChild.classList.add('hit'); Sfx.tick(); }
+      else { box.firstChild.classList.add('miss'); }
+      round++;
+      if (round>=total) return finish();
+      timeLeft=1.1; renderRound();
+    }
+    window.addEventListener('keydown', handler);
+    function finish() {
+      clearInterval(interval);
+      window.removeEventListener('keydown', handler);
+      const won = hits >= total*0.6;
+      if (won) { applyPercent('wp', +30); Game.showResult('You won the race!', 'Willpower +30%.', ()=>Game.runNextLesson()); }
+      else { S.wp = 0; updateHud(); }
+    }
+  },
+  showResult(title, desc, cont) {
+    document.getElementById('resultTitle').textContent = title;
+    document.getElementById('resultDesc').textContent = desc;
+    this._resultContinue = cont;
+    showScreen('screen-result');
+  },
+  continueAfterResult() { if (this._resultContinue) this._resultContinue(); },
+
+  doLunch(choice) {
+    Sfx.select();
+    if (choice==='king') { applyPercent('wp', +15); applyPercent('int', -10); }
+    if (choice==='homework') { applyPercent('int', +15); applyPercent('wp', -10); applyPercent('rep', -5); }
+    this.runBioQuadruple();
+  },
+
+  /* --- entering lunch auto-boosts stats first --- */
+  enterLunch() {
+    applyPercent('wp', +25); applyPercent('int', +25); applyPercent('rep', +25);
+    showScreen('screen-lunch');
+  },
+
+  runBioQuadruple() {
+    showScreen('screen-fight');
+    const bosses = [
+      { key:'kirsten', name:'Ms Kirsten', hp:70, maxHp:70, color:'#cc88ff', x:110, y:100,
+        moveFn:(b,t)=>{ b.x=b.baseX+Math.cos(t*0.8)*20; b.y=b.baseY+Math.sin(t*0.8)*20; } },
+      { key:'lau', name:'Ms Lau', hp:70, maxHp:70, color:'#ff99cc', x:530, y:100,
+        moveFn:(b,t)=>{ b.x=b.baseX+Math.sin(t*1.1)*26; } },
+      { key:'maan', name:'Ms Maan', hp:70, maxHp:70, color:'#99ccff', x:110, y:330,
+        moveFn:(b,t)=>{ b.y=b.baseY+Math.sin(t*1.4)*24; } },
+      { key:'potter', name:'Ms Potter', hp:78, maxHp:78, color:'#ffcc66', x:530, y:330,
+        moveFn:(b,t)=>{ b.x=b.baseX+Math.cos(-t*1.0)*22; b.y=b.baseY+Math.sin(-t*1.0)*22; } },
+    ];
+    const fight = new Fight('fightCanvas', {
+      bosses, difficulty: 'Moderate-Hard',
+      instructions: 'The Bio Quadruple — one in each corner, each with their own attack. Get close and swing!',
+      patternFns: ['kirsten','lau','maan','potter'].map(k => pat_bioAttack(k)),
+      onEnd: (win) => {
+        if (win) this.showResult('Biology Cleared', 'You survived the Bio Quadruple.', ()=>this.runPE());
+        else this.die('The Bio Quadruple overwhelmed you.');
+      }
+    });
+    fight.start();
+  },
+  runPE() {
+    showScreen('screen-fight');
+    const fight = new Fight('fightCanvas', {
+      bossName: 'Mr Hillyer', color:'#ff5566', hp: 150, difficulty:'Hard',
+      instructions: 'Dodge the hockey ball rhythm. Get close and swing to hit back.',
+      patternFns: [pat_hockeyFlick],
+      onSubBossDefeat: (f, boss) => {
+        // enrage: giant hockey stick sweep
+        f.spawnBullet({shape:'rect', x:320, y:210, w:600, h:60, color:'#552200', damage:40, life:0.5,
+          update(b,dt){ b.life-=dt; if(b.life<=0) b.dead=true; }});
+      },
+      onEnd: (win) => {
+        if (win) this.showResult('PE Cleared', 'Mr Hillyer is down. On to lunch\'s dark epilogue...', ()=>this.startMcara());
+        else this.die('Mr Hillyer\'s hockey stick finished you off.');
+      }
+    });
+    fight.bosses[0].x = 320; fight.bosses[0].y = 90;
+    fight.start();
+  },
+
+  startMcara() { showScreen('screen-mcara'); },
+  mcaraChoice(choice) {
+    Sfx.select();
+    if (choice==='go') {
+      let t = 0;
+      const iv = setInterval(()=>{
+        t += 1;
+        S.wp = Math.max(1, S.wp*0.7); S.int = Math.max(1,S.int*0.7); S.rep = Math.max(1,S.rep*0.7);
+        updateHud();
+        if (t>=5) { clearInterval(iv); this.showClassicsDeath(); }
+      }, 500);
+      showScreen('screen-classicsdeath');
+      document.getElementById('classicsText').textContent = 'A shadow shaped like Caecilius approaches. Five layers of teeth turn like a chainsaw...';
+    } else {
+      this.startChase();
+    }
+  },
+  showClassicsDeath() {
+    document.getElementById('classicsText').textContent = 'An English-to-Latin dictionary flies from the dark and strikes you down.';
+    setTimeout(()=> this.die('You went to Classics Society. You should not have gone to Classics Society.'), 1400);
+  },
+  startChase() {
+    showScreen('screen-chase');
+    const canvas = document.getElementById('chaseCanvas');
+    const ctx = canvas.getContext('2d');
+    let lane = 1; // 0,1,2
+    const lanesX = [160,320,480];
+    let obstacles = [];
+    let t=0, running=true, gap=0.8, obstacleSpeed=330;
+    const keydown = (e) => {
+      if (e.key==='ArrowLeft'||e.key.toLowerCase()==='a') lane=Math.max(0,lane-1);
+      if (e.key==='ArrowRight'||e.key.toLowerCase()==='d') lane=Math.min(2,lane+1);
+    };
+    window.addEventListener('keydown', keydown);
+    let last = performance.now();
+    function spawnObstacle() {
+      obstacles.push({lane: Math.floor(Math.random()*3), y:-20});
+      // after 8 seconds, sometimes throw a second obstacle in a different lane to force real choices
+      if (t > 8 && Math.random() < 0.35) {
+        let l2 = Math.floor(Math.random()*3);
+        obstacles.push({lane:l2, y:-60});
+      }
+    }
+    let spawnTimer=0;
+    function loop(ts) {
+      if (!running) return;
+      const dt = Math.min(0.033,(ts-last)/1000); last=ts; t+=dt; spawnTimer+=dt;
+      obstacleSpeed = 330 + t*4; // gets faster the longer you run
+      if (spawnTimer > gap) { spawnTimer=0; spawnObstacle(); gap = Math.max(0.32, gap-0.015); }
+      obstacles.forEach(o=>o.y += obstacleSpeed*dt);
+      for (const o of obstacles) {
+        if (!o.hit && o.y > 330 && o.y < 380 && o.lane===lane) {
+          o.hit = true;
+          takeDamage(18);
+          if (S.wp<=0) { running=false; window.removeEventListener('keydown', keydown); Game.die('The shadow caught you.'); return; }
+        }
+      }
+      obstacles = obstacles.filter(o=>o.y<440);
+      ctx.clearRect(0,0,640,420);
+      ctx.fillStyle='#222';
+      lanesX.forEach(x=>{ ctx.fillRect(x-70,0,140,420); });
+      ctx.fillStyle='#111'; ctx.fillRect(0,0,640,420); ctx.globalAlpha=0.0;
+      ctx.globalAlpha=1;
+      lanesX.forEach(x=>{ ctx.strokeStyle='#444'; ctx.strokeRect(x-70,0,140,420); });
+      ctx.fillStyle='#8b0000';
+      ctx.fillRect(lanesX[lane]-70, 420-t*7-60, 140, 40); // shadow closes in faster now
+      ctx.fillStyle='#ff5566';
+      obstacles.forEach(o=>{ ctx.fillRect(lanesX[o.lane]-20, o.y, 40, 24); });
+      ctx.fillStyle='#ffd24d';
+      ctx.fillRect(lanesX[lane]-14, 350, 28, 28);
+      document.getElementById('fightOverlayText').textContent = `RUN — ${Math.max(0,(30-t)).toFixed(1)}s`;
+      if (t >= 30) { running=false; window.removeEventListener('keydown', keydown); Game.showResult('You reach a clearing', 'You burst into an open space. Something is waiting.', ()=>Game.runFinalBoss()); return; }
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  },
+
+  triggerLatinQTE() {
+    if (this._qteActive) return;
+    this._qteActive = true;
+    if (this._activeFight) this._activeFight.pause();
+    showScreen('screen-qte');
+    const words = [
+      {la:'puella', en:'girl'}, {la:'servus', en:'slave'}, {la:'canis', en:'dog'},
+      {la:'aqua', en:'water'}, {la:'magnus', en:'big'}, {la:'ambulat', en:'walks'},
+      {la:'portat', en:'carries'}, {la:'via', en:'road'}
+    ];
+    const w = words[Math.floor(Math.random()*words.length)];
+    document.getElementById('qteTitle').textContent = `Translate: "${w.la}"`;
+    const box = document.getElementById('qteBox'); box.innerHTML='';
+    const input = document.getElementById('translateInput');
+    input.style.display='block'; input.value=''; input.focus();
+    let timeLeft = 10;
+    const timerFill = document.getElementById('timerFill');
+    const iv = setInterval(()=>{
+      timeLeft -= 0.1; timerFill.style.width = Math.max(0,(timeLeft/10*100))+'%';
+      if (timeLeft<=0) finish(false);
+    }, 100);
+    const onKey = (e) => { if (e.key==='Enter') finish(input.value.trim().toLowerCase()===w.en); };
+    input.addEventListener('keydown', onKey);
+    const self = this;
+    function finish(correct) {
+      clearInterval(iv);
+      input.removeEventListener('keydown', onKey);
+      input.style.display='none';
+      if (!correct) takeDamage(10);
+      self._qteActive = false;
+      if (S.wp > 0 && self._activeFight) { showScreen('screen-fight'); self._activeFight.resume(); }
+    }
+  },
+
+  triggerReactionQTE(fight, baseDamage, followEffect) {
+    if (this._qteActive) {
+      // already mid-QTE somehow; just resolve as a hit rather than stack UI
+      takeDamage(baseDamage);
+      if (followEffect) followEffect(fight);
+      fight.resume();
+      return;
+    }
+    this._qteActive = true;
+    showScreen('screen-qte');
+    document.getElementById('qteTitle').textContent = 'Incoming hit! Press the arrow shown to brace!';
+    const box = document.getElementById('qteBox'); box.innerHTML='';
+    const input = document.getElementById('translateInput'); input.style.display='none';
+    const dirs = ['←','↑','→','↓'];
+    const target = dirs[Math.floor(Math.random()*4)];
+    const el = document.createElement('div'); el.className='qte-key'; el.textContent = target;
+    box.appendChild(el);
+    let timeLeft = 0.75;
+    const timerFill = document.getElementById('timerFill');
+    const map = {'arrowleft':'←','arrowup':'↑','arrowright':'→','arrowdown':'↓'};
+    let done = false;
+    const iv = setInterval(()=>{
+      timeLeft -= 0.03; timerFill.style.width = Math.max(0,(timeLeft/0.75*100))+'%';
+      if (timeLeft<=0) finish(false);
+    }, 30);
+    const onKey = (e) => { const k = map[e.key.toLowerCase()]; if (!k) return; finish(k===target); };
+    window.addEventListener('keydown', onKey);
+    const self = this;
+    function finish(success) {
+      if (done) return; done = true;
+      clearInterval(iv);
+      window.removeEventListener('keydown', onKey);
+      if (success) { el.classList.add('hit'); } else { el.classList.add('miss'); }
+      const dmg = success ? baseDamage * 0.3 : baseDamage * 1.2;
+      setTimeout(()=>{
+        takeDamage(dmg);
+        if (followEffect) followEffect(fight);
+        self._qteActive = false;
+        if (S.wp > 0) { showScreen('screen-fight'); fight.resume(); }
+      }, 150);
+    }
+  },
+
+  runFinalBoss() {
+    showScreen('screen-fight');
+    const fight = new Fight('fightCanvas', {
+      bossName: 'Mr McAra', color:'#8b0000', hp: 320, difficulty: 'Extremely Hard',
+      attackCooldown: 0.55, attackRange: 60,
+      instructions: 'Textbooks force a Latin translation. Get close and swing when the coast is clear.',
+      patternFns: [pat_mcaraTextbooks],
+      onEnd: (win) => {
+        this._activeFight = null;
+        if (win) { this.win(); }
+        else this.die('Mr McAra was too much.');
+      }
+    });
+    fight.bosses[0].x = 320; fight.bosses[0].y = 90;
+    this._activeFight = fight;
+    fight.start();
+    // Phase progression: 100%-65% intro, 65%-32% adds spinning arms + rising pens,
+    // below 32% every non-textbook hit forces a quick brace QTE and attacks speed up.
+    const check = setInterval(()=>{
+      if (fight.finished) { clearInterval(check); return; }
+      const ratio = fight.bosses[0].hp / fight.bosses[0].maxHp;
+      if (ratio <= 0.65 && !fight._phase2) {
+        fight._phase2 = true;
+        pat_spinningArms(fight);
+        pat_pensFromGround(fight);
+        document.getElementById('fightOverlayText').textContent = 'PHASE 2: his arms spin, pens rise from the floor!';
+      }
+      if (ratio <= 0.32 && !fight._phase3) {
+        fight._phase3 = true;
+        fight.qtePhaseActive = true;
+        pat_mcaraTextbooks(fight); // second faster textbook stream layered in
+        document.getElementById('fightOverlayText').textContent = 'PHASE 3: every hit forces a snap reaction — stay sharp!';
+      }
+    }, 300);
+
+  },
+
+  die(reason) {
+    document.getElementById('deathReason').textContent = reason;
+    Sfx.death();
+    showScreen('screen-death');
+  },
+  becomeActor() { showScreen('screen-actor'); },
+  win() {
+    Sfx.win();
+    document.getElementById('winDesc').textContent =
+      `Final stats — Willpower ${Math.round(S.wp)}/100, Intelligence ${Math.round(S.int)}/100, Class Rep ${Math.round(S.rep)}/50. You made it home.`;
+    showScreen('screen-win');
+  }
+};
+
+/* wire the lunch screen entry (stat boost) when arriving from result of periods2&3 */
+const _origShowScreen = showScreen;
+window.addEventListener('DOMContentLoaded', () => {
+  updateHud();
+});
+</script>
+</body>
+</html>
