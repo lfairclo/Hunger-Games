@@ -106,6 +106,20 @@
 </head>
 <body>
 <div id="app">
+  <!-- PASSWORD GATE — blocks everything until the correct password is entered.
+       The expected hash is fetched at runtime from a GitHub-hosted text file,
+       not embedded in this HTML, so it isn't sitting in plain view of "View Source".
+       See PASSWORD_HASH_URL below — you need to host that file yourself. -->
+  <div id="passwordGate" style="position:fixed; inset:0; background:#05050a; z-index:999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;">
+    <h1 style="letter-spacing:2px;">🔒 SCHOOL SIMULATOR</h1>
+    <p class="subtle" style="max-width:420px; text-align:center;">Enter the password to continue.</p>
+    <input id="passwordInput" type="password" autocomplete="off" style="font-family:inherit; font-size:16px; padding:8px 12px; width:240px; text-align:center; background:#16161f; border:2px solid #666; color:#f2f2f2; border-radius:4px;">
+    <button class="choice" id="passwordSubmit" style="min-width:0;">Enter</button>
+    <p id="passwordError" style="color:#ff5566; min-height:18px;"></p>
+  </div>
+  <div id="escReminder" style="display:none; position:fixed; bottom:6px; left:0; right:0; text-align:center; z-index:998; color:#ffd24d; font-size:13px; text-shadow:0 0 4px #000; pointer-events:none;">
+    ⚠ Press ESC at any time to instantly leave this page (opens Google Classroom).
+  </div>
   <div id="hud" style="display:none;">
     <div class="hud-bar-wrap">
       <div class="hud-label"><span>Willpower</span><span id="wp-text">100/100</span></div>
@@ -263,6 +277,90 @@
 </div>
 
 <script>
+/* =========================================================
+   PASSWORD GATE
+   ---------------------------------------------------------
+   The expected password is never written into this file as
+   plain text. Instead we fetch a SHA-256 hash of it at runtime
+   from a file you host on GitHub, and hash whatever the user
+   types to compare. This keeps the plaintext out of "View Source",
+   but it is NOT bulletproof — anyone who opens DevTools -> Network
+   can see the hash get fetched, and a short/guessable password can
+   still be brute-forced offline once someone has that hash. This
+   is "keep a teacher glancing at your screen out", not real security.
+
+   TO SET THIS UP:
+   1. Pick a password.
+   2. Compute its SHA-256 hash (lowercase hex). You can do this in
+      any browser console with:
+        crypto.subtle.digest('SHA-256', new TextEncoder().encode('yourPasswordHere'))
+          .then(b => console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')));
+   3. Create a PUBLIC file on GitHub (a gist, or a file in a repo)
+      containing ONLY that hex string, nothing else.
+   4. Replace PASSWORD_HASH_URL below with that file's raw URL
+      (raw.githubusercontent.com/... or the gist's raw link).
+   ========================================================= */
+const PASSWORD_HASH_URL = 'https://raw.githubusercontent.com/lfairclo/Hunger-Games/main/password.txt';
+
+async function sha256Hex(str) {
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function tryPassword() {
+  const input = document.getElementById('passwordInput');
+  const errEl = document.getElementById('passwordError');
+  const submitBtn = document.getElementById('passwordSubmit');
+  const candidate = input.value;
+  if (!candidate) return;
+  submitBtn.disabled = true;
+  errEl.textContent = 'Checking...';
+  try {
+    const res = await fetch(PASSWORD_HASH_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('unreachable');
+    const expected = (await res.text()).trim().toLowerCase();
+    const actual = await sha256Hex(candidate);
+    if (actual === expected && expected.length === 64) {
+      document.getElementById('passwordGate').style.display = 'none';
+      document.getElementById('escReminder').style.display = 'block';
+    } else {
+      errEl.textContent = 'Wrong password.';
+      input.value = '';
+      input.focus();
+    }
+  } catch (e) {
+    errEl.textContent = 'Could not reach the password file (check the URL / your connection).';
+  }
+  submitBtn.disabled = false;
+}
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('passwordSubmit').addEventListener('click', tryPassword);
+  document.getElementById('passwordInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryPassword(); });
+  document.getElementById('passwordInput').focus();
+});
+
+/* =========================================================
+   ESCAPE KEY — best-effort "boss key".
+   Redirects to Google Classroom immediately, tries to close the
+   tab, and rigs the back button so it doesn't return here.
+   HONEST LIMITS: a web page cannot delete entries from your
+   browser's History — browsers deliberately block that. And
+   window.close() only actually works on tabs that were opened
+   by a script; on a normal tab most browsers will just ignore it.
+   The redirect + back-button trap below are what's realistically
+   achievable from plain JavaScript.
+   ========================================================= */
+function escapeBossKey() {
+  try { for (let i=0;i<6;i++) history.pushState({trap:true}, '', location.href); } catch(e) {}
+  window.addEventListener('popstate', () => { window.location.replace('https://classroom.google.com/'); });
+  try { window.close(); } catch(e) {}
+  window.location.replace('https://classroom.google.com/');
+}
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') escapeBossKey();
+});
+
 /* =========================================================
    AUDIO — tiny synthesized SFX, no external files needed
    ========================================================= */
@@ -430,6 +528,7 @@ class Fight {
   }
   start() {
     this.running = true;
+    Game._currentSkippable = { skip: () => this.finish(true), owner: this };
     window.addEventListener('keydown', this._keydown);
     window.addEventListener('keyup', this._keyup);
     document.getElementById('bossNamePlate').textContent =
@@ -533,6 +632,7 @@ class Fight {
     if (this.finished) return;
     this.finished = true;
     this.running = false;
+    if (Game._currentSkippable && Game._currentSkippable.owner === this) Game._currentSkippable = null;
     this.timers.forEach(id => clearInterval(id));
     window.removeEventListener('keydown', this._keydown);
     window.removeEventListener('keyup', this._keyup);
@@ -839,6 +939,14 @@ const Game = {
     const key = this._lessonQueue.shift();
     S.currentSubject = key;
     const subj = SUBJECTS[key];
+    // Always reset these buttons to their default lesson behaviour — PE's screen
+    // temporarily repurposes them, and the same DOM nodes get reused on replay.
+    const btnSit = document.getElementById('btnSit');
+    const btnFight = document.getElementById('btnFight');
+    btnSit.textContent = 'Sit through the lesson';
+    btnSit.onclick = () => this.sitThroughCurrent();
+    btnFight.textContent = 'Fight the teacher';
+    btnFight.onclick = () => this.startFightCurrent();
     document.getElementById('lessonTitle').textContent = subj.name + ' — ' + subj.teacher;
     document.getElementById('lessonDesc').textContent = subj.sitDesc + `  (Fight difficulty: ${subj.fight.difficulty})`;
     showScreen('screen-lessonintro');
@@ -934,9 +1042,11 @@ const Game = {
       timeLeft=1.1; renderRound();
     }
     window.addEventListener('keydown', handler);
+    Game._currentSkippable = { skip: () => { hits = total; round = total; finish(); } };
     function finish() {
       clearInterval(interval);
       window.removeEventListener('keydown', handler);
+      Game._currentSkippable = null;
       const won = hits >= total*0.6;
       if (won) { applyPercent('wp', +30); Game.showResult('You won the race!', 'Willpower +30%.', ()=>Game.runNextLesson()); }
       else { S.wp = 0; updateHud(); }
@@ -987,6 +1097,19 @@ const Game = {
     fight.start();
   },
   runPE() {
+    document.getElementById('lessonTitle').textContent = 'PE — Mr Hillyer';
+    document.getElementById('lessonDesc').textContent =
+      'Mr Hillyer is waiting on the pitch with a hockey stick. You can fight him for the challenge (you\'ll start fully healed), or just duck out of PE entirely.';
+    const btnSit = document.getElementById('btnSit');
+    const btnFight = document.getElementById('btnFight');
+    btnSit.textContent = 'Skip PE';
+    btnSit.onclick = () => { Sfx.select(); this.startMcara(); };
+    btnFight.textContent = 'Fight Mr Hillyer (full heal first)';
+    btnFight.onclick = () => { Sfx.select(); this.startPEFight(); };
+    showScreen('screen-lessonintro');
+  },
+  startPEFight() {
+    S.wp = S.maxWp; updateHud(); // full heal before this optional fight
     showScreen('screen-fight');
     const fight = new Fight('fightCanvas', {
       bossName: 'Mr Hillyer', color:'#ff5566', hp: 150, difficulty:'Hard',
@@ -1041,6 +1164,11 @@ const Game = {
     };
     window.addEventListener('keydown', keydown);
     let last = performance.now();
+    function endChase() {
+      running=false; window.removeEventListener('keydown', keydown); Game._currentSkippable = null;
+      Game.showResult('You reach a clearing', 'You burst into an open space. Something is waiting.', ()=>Game.runFinalBoss());
+    }
+    Game._currentSkippable = { skip: () => endChase() };
     function spawnObstacle() {
       obstacles.push({lane: Math.floor(Math.random()*3), y:-20});
       // after 8 seconds, sometimes throw a second obstacle in a different lane to force real choices
@@ -1060,7 +1188,7 @@ const Game = {
         if (!o.hit && o.y > 330 && o.y < 380 && o.lane===lane) {
           o.hit = true;
           takeDamage(18);
-          if (S.wp<=0) { running=false; window.removeEventListener('keydown', keydown); Game.die('The shadow caught you.'); return; }
+          if (S.wp<=0) { running=false; window.removeEventListener('keydown', keydown); Game._currentSkippable = null; Game.die('The shadow caught you.'); return; }
         }
       }
       obstacles = obstacles.filter(o=>o.y<440);
@@ -1070,14 +1198,12 @@ const Game = {
       ctx.fillStyle='#111'; ctx.fillRect(0,0,640,420); ctx.globalAlpha=0.0;
       ctx.globalAlpha=1;
       lanesX.forEach(x=>{ ctx.strokeStyle='#444'; ctx.strokeRect(x-70,0,140,420); });
-      ctx.fillStyle='#8b0000';
-      ctx.fillRect(lanesX[lane]-70, 420-t*7-60, 140, 40); // shadow closes in faster now
       ctx.fillStyle='#ff5566';
       obstacles.forEach(o=>{ ctx.fillRect(lanesX[o.lane]-20, o.y, 40, 24); });
       ctx.fillStyle='#ffd24d';
       ctx.fillRect(lanesX[lane]-14, 350, 28, 28);
       document.getElementById('fightOverlayText').textContent = `RUN — ${Math.max(0,(30-t)).toFixed(1)}s`;
-      if (t >= 30) { running=false; window.removeEventListener('keydown', keydown); Game.showResult('You reach a clearing', 'You burst into an open space. Something is waiting.', ()=>Game.runFinalBoss()); return; }
+      if (t >= 30) { endChase(); return; }
       requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
@@ -1208,8 +1334,31 @@ const Game = {
     document.getElementById('winDesc').textContent =
       `Final stats — Willpower ${Math.round(S.wp)}/100, Intelligence ${Math.round(S.int)}/100, Class Rep ${Math.round(S.rep)}/50. You made it home.`;
     showScreen('screen-win');
-  }
+  },
+  _currentSkippable: null,
 };
+
+/* =========================================================
+   CHEAT CODE — type 6767420 in quick succession to skip
+   whatever fight/minigame is currently active.
+   ========================================================= */
+(function cheatCodeListener() {
+  let buffer = '';
+  let lastKeyTime = 0;
+  const CODE = '6767420';
+  window.addEventListener('keydown', (e) => {
+    if (!/^[0-9]$/.test(e.key)) return;
+    const now = performance.now();
+    if (now - lastKeyTime > 1200) buffer = ''; // too slow, reset
+    lastKeyTime = now;
+    buffer += e.key;
+    if (buffer.length > CODE.length) buffer = buffer.slice(-CODE.length);
+    if (buffer === CODE) {
+      buffer = '';
+      if (Game._currentSkippable) { Sfx.select(); Game._currentSkippable.skip(); }
+    }
+  });
+})();
 
 /* wire the lunch screen entry (stat boost) when arriving from result of periods2&3 */
 const _origShowScreen = showScreen;
@@ -1218,4 +1367,5 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
+
 </html>
