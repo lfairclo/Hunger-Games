@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unavailable</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1 style="color:#ff5566;">Sorry, unavailable at this time</h1>
+  <p class="desc">Try focusing on your lesson.</p>
+  <p class="subtle">This page checks the time automatically and will send you on once you're back in an allowed window.</p>
+</div>
+<div id="escReminder">⚠ Press ESC at any time to instantly leave this page (opens Google Classroom).</div>
+
+<script src="shared/time-gate.js"></script>
+<script src="shared/esc-bosskey.js"></script>
+<script>
+setInterval(function () {
+  if (window.SchoolSim.isWithinAllowedWindow()) {
+    window.location.replace('lobby.html');
+  }
+}, 15000);
+</script>
+</body>
+</html>

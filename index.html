@@ -2,167 +2,94 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>THE ARENA — Tribute Simulator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<title>Game Portal</title>
+<link rel="stylesheet" href="shared/style.css">
 </head>
 <body>
-
-<div class="shell">
-  <nav class="sidenav">
-    <div class="brand">
-      <div class="brand-mark">THE <span>ARENA</span></div>
-      <div class="brand-sub">TRIBUTE SIMULATOR</div>
-    </div>
-    <ul class="nav-list">
-      <li class="nav-item active" data-view="setup">Setup</li>
-      <li class="nav-item" data-view="arena">Arena</li>
-      <li class="nav-item" data-view="map">Map</li>
-      <li class="nav-item" data-view="standings">Standings</li>
-    </ul>
-    <div class="nav-meta" id="navMeta">
-      <div class="row"><span>Tributes</span><b id="metaTotal">0</b></div>
-      <div class="row"><span>Alive</span><b id="metaAlive">0</b></div>
-      <div class="row"><span>Phase</span><b id="metaPhase">—</b></div>
-    </div>
-  </nav>
-
-  <main class="main">
-
-    <!-- ===================== SETUP ===================== -->
-    <section class="view active" id="view-setup">
-      <h1 class="page-title">Cast the Games</h1>
-      <p class="page-sub">Build a roster of any size. Everything that happens after the gong is generated automatically — no one needs to be controlled by hand.</p>
-
-      <div class="card">
-        <h2>Add Tributes</h2>
-        <div class="row-flex" style="margin-bottom:14px;">
-          <input type="text" id="singleNameInput" placeholder="Type a name and press Add…" style="max-width:260px;">
-          <button class="gold" id="btnAddSingle">Add Tribute</button>
-          <span style="width:16px;"></span>
-          <input type="number" id="randomCountInput" value="4" min="1" max="48" style="max-width:80px;">
-          <button id="btnAddRandom">Add Random Tributes</button>
-        </div>
-        <div class="field">
-          <label>Or paste one name per line</label>
-          <textarea id="bulkNames" rows="3" placeholder="Katniss Ashgrove&#10;Peeta Oakhart&#10;..."></textarea>
-          <div class="row-flex" style="margin-top:8px;"><button id="btnBulkAdd">Add From List</button></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Roster <span class="badge-count" id="rosterCount">0</span></h2>
-        <table class="roster-table" id="rosterTable"><tbody></tbody></table>
-        <div class="empty-state" id="rosterEmpty">No tributes yet. Add some above to begin.</div>
-      </div>
-
-      <div class="card">
-        <h2>Portraits <small>random images pulled from a folder in this project's GitHub repo</small></h2>
-        <p class="hint" style="margin-top:0;">Tributes automatically get a random portrait from the <code>avatars</code> folder in the <code>lfairclo/Hunger-Games</code> repo. If that's unreachable (offline, folder empty, etc.) they fall back to a generated emblem instead.</p>
-        <div class="row-flex">
-          <button id="btnShufflePortraits">Shuffle Roster Portraits</button>
-          <button class="ghost" id="btnUseGeneratedPortraits">Use Generated Emblems Instead</button>
-        </div>
-        <p class="hint" id="portraitStatus">Checking GitHub…</p>
-      </div>
-
-      <div class="card">
-        <h2>Game Settings</h2>
-        <div class="checkline" style="margin-bottom:12px;">
-          <input type="checkbox" id="teamVictoryToggle">
-          <label style="margin:0;" for="teamVictoryToggle">Allow an allied team to win together (Team Victory mode)</label>
-        </div>
-        <div class="row-flex">
-          <button class="gold" id="btnExportRoster">Export Roster</button>
-          <button id="btnImportRosterTrigger">Import Roster</button>
-          <input type="file" id="importRosterFile" accept="application/json" style="display:none;">
-          <button class="ghost danger" id="btnClearRoster">Clear All</button>
-        </div>
-      </div>
-
-      <button class="primary" id="btnStartGames" style="font-size:16px; padding:14px 28px;">Begin the Games</button>
-    </section>
-
-    <!-- ===================== ARENA ===================== -->
-    <section class="view" id="view-arena">
-      <h1 class="page-title">The Arena</h1>
-      <p class="page-sub">Watch events unfold phase by phase, or let the games play out on their own.</p>
-
-      <div class="arena-layout">
-        <div>
-          <div class="phase-banner" id="phaseBanner">Awaiting the games…<div class="n" id="phaseBannerSub"></div></div>
-          <div class="controls-bar">
-            <button class="primary" id="btnNextPhase">Next Phase</button>
-            <button class="gold" id="btnPlay">▶ Autoplay</button>
-            <select id="speedSelect" style="max-width:130px;">
-              <option value="1400">Normal Speed</option>
-              <option value="600">Fast</option>
-              <option value="150">Very Fast</option>
-            </select>
-            <button id="btnRunToEnd">Run To End</button>
-            <button class="ghost" id="btnResetGame">New Game</button>
-          </div>
-          <div id="winnerBannerHolder"></div>
-          <div class="feed" id="feed"></div>
-        </div>
-        <div>
-          <h2 style="font-family:var(--font-display); font-size:14px; color:var(--muted); margin:0 0 10px;">TRIBUTES</h2>
-          <div class="roster-strip" id="rosterStrip"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== MAP ===================== -->
-    <section class="view" id="view-map">
-      <h1 class="page-title">Arena Map</h1>
-      <p class="page-sub">Where everyone currently stands.</p>
-      <div class="map-wrap">
-        <svg class="map-svg" id="mapSvg" viewBox="0 0 100 100"></svg>
-      </div>
-      <div class="map-legend">
-        <span><span class="dot" style="background:var(--blood)"></span>Wildfire</span>
-        <span><span class="dot" style="background:#5a7a94"></span>Flood</span>
-        <span><span class="dot" style="background:var(--twist)"></span>Toxic fog</span>
-        <span><span class="dot" style="background:#0a0a0a; border:1px solid var(--blood)"></span>Collapsed</span>
-      </div>
-    </section>
-
-    <!-- ===================== STANDINGS ===================== -->
-    <section class="view" id="view-standings">
-      <h1 class="page-title">Standings</h1>
-      <p class="page-sub">The full record — visitable at any point in the games.</p>
-      <div id="standingsSummary"></div>
-      <div class="card">
-        <table class="standings-table" id="standingsTable">
-          <thead>
-            <tr>
-              <th data-sort="name">Tribute</th>
-              <th data-sort="status">Status</th>
-              <th data-sort="kills">Kills</th>
-              <th data-sort="location">Location</th>
-              <th data-sort="team">Alliance</th>
-              <th>Traits</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <div class="empty-state" id="standingsEmpty">No tributes yet — set up a roster to see standings here.</div>
-      </div>
-    </section>
-
-  </main>
+<div class="wrap">
+  <h1>GAME PORTAL</h1>
+  <div class="card" id="loginBox" style="display:none;">
+    <p class="desc">Sign in with your Google account to continue.</p>
+    <button id="googleBtn">Sign in with Google</button>
+    <p class="error" id="statusText"></p>
+  </div>
+  <div class="card" id="pendingBox" style="display:none;">
+    <p class="desc" id="pendingText"></p>
+    <button id="signOutBtn">Sign out</button>
+  </div>
+  <div class="card" id="checkingBox">
+    <p class="desc">Checking...</p>
+  </div>
 </div>
+<div id="escReminder"></div>
 
-<!-- ===================== PLAYER MODAL ===================== -->
-<div class="modal-backdrop" id="modalBackdrop">
-  <div class="modal" id="modalContent"></div>
-</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="shared/firebase-init.js"></script>
+<script src="shared/session.js"></script>
+<script src="shared/time-gate.js"></script>
+<script src="shared/esc-bosskey.js"></script>
+<script>
+document.getElementById('escReminder').textContent =
+  '⚠ Press ESC at any time to instantly leave this page (opens Google Classroom).';
 
-<script src="data.js"></script>
-<script src="engine.js"></script>
-<script src="avatars.js"></script>
-<script src="main.js"></script>
+// Time gate applies before anything else, including the login screen itself.
+if (window.SchoolSim.enforceTimeGate()) {
+  window.SchoolSim.initSessionExpiry();
+
+  const loginBox = document.getElementById('loginBox');
+  const pendingBox = document.getElementById('pendingBox');
+  const checkingBox = document.getElementById('checkingBox');
+  const statusText = document.getElementById('statusText');
+
+  function showOnly(el) {
+    [loginBox, pendingBox, checkingBox].forEach(x => x.style.display = 'none');
+    el.style.display = 'block';
+  }
+
+  document.getElementById('googleBtn').addEventListener('click', function () {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).then(function () {
+      window.SchoolSim.markLoginNow();
+    }).catch(function (err) {
+      statusText.textContent = 'Sign-in failed: ' + err.message;
+    });
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', function () {
+    auth.signOut();
+  });
+
+  auth.onAuthStateChanged(function (user) {
+    if (!user) { showOnly(loginBox); return; }
+    showOnly(checkingBox);
+    const userRef = db.collection('users').doc(user.uid);
+    userRef.get().then(function (doc) {
+      if (!doc.exists) {
+        return userRef.set({
+          email: user.email,
+          displayName: user.displayName || '',
+          approved: false,
+          requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(function () { return userRef.get(); });
+      }
+      return doc;
+    }).then(function (doc) {
+      const data = doc.data();
+      if (!data || data.approved !== true) {
+        document.getElementById('pendingText').textContent =
+          'Your account (' + user.email + ') is waiting for approval.';
+        showOnly(pendingBox);
+        return;
+      }
+      window.location.replace('lobby.html');
+    }).catch(function (err) {
+      statusText.textContent = 'Error: ' + err.message;
+      showOnly(loginBox);
+    });
+  });
+}
+</script>
 </body>
 </html>

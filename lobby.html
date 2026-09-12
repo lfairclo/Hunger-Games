@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Choose a Game</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>CHOOSE A GAME</h1>
+  <p class="desc" id="statusText">Loading...</p>
+  <div class="game-list" id="gameList"></div>
+  <button id="signOutBtn" style="margin-top:10px;">Sign out</button>
+</div>
+<div id="escReminder">⚠ Press ESC at any time to instantly leave this page (opens Google Classroom).</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="shared/firebase-init.js"></script>
+<script src="shared/session.js"></script>
+<script src="shared/time-gate.js"></script>
+<script src="shared/esc-bosskey.js"></script>
+<script>
+if (window.SchoolSim.enforceTimeGate()) {
+  window.SchoolSim.initSessionExpiry();
+  window.SchoolSim.startTimeGateWatcher(30000);
+
+  const statusText = document.getElementById('statusText');
+  const gameList = document.getElementById('gameList');
+
+  document.getElementById('signOutBtn').addEventListener('click', function () {
+    auth.signOut().then(function () { window.location.replace('index.html'); });
+  });
+
+  auth.onAuthStateChanged(function (user) {
+    if (!user) { window.location.replace('index.html'); return; }
+    db.collection('users').doc(user.uid).get().then(function (doc) {
+      const data = doc.data();
+      if (!data || data.approved !== true) { window.location.replace('index.html'); return; }
+      statusText.textContent = 'Signed in as ' + user.email;
+      loadGames();
+    }).catch(function () {
+      window.location.replace('index.html');
+    });
+  });
+
+  function loadGames() {
+    fetch('games.json').then(function (r) { return r.json(); }).then(function (games) {
+      gameList.innerHTML = '';
+      if (!games.length) { gameList.textContent = 'No games listed yet.'; return; }
+      games.forEach(function (g) {
+        const a = document.createElement('a');
+        a.href = g.url;
+        a.textContent = g.name;
+        a.className = 'game-btn';
+        gameList.appendChild(a);
+      });
+    }).catch(function () {
+      gameList.textContent = 'Could not load games.json.';
+    });
+  }
+}
+</script>
+</body>
+</html>

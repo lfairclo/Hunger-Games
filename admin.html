@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin</title>
+<link rel="stylesheet" href="shared/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>ADMIN — APPROVE USERS</h1>
+  <p class="desc" id="statusText">Checking...</p>
+  <table id="userTable" style="display:none;">
+    <thead><tr><th>Email</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="userRows"></tbody>
+  </table>
+</div>
+<div id="escReminder">⚠ Press ESC at any time to instantly leave this page (opens Google Classroom).</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="shared/firebase-init.js"></script>
+<script src="shared/time-gate.js"></script>
+<script src="shared/esc-bosskey.js"></script>
+<script>
+// Admin is subject to the same time window as everything else (per spec).
+// If you'd rather approve people anytime, delete the next 3 lines.
+if (window.SchoolSim.enforceTimeGate()) {
+  runAdmin();
+}
+
+function runAdmin() {
+  const statusText = document.getElementById('statusText');
+  const userTable = document.getElementById('userTable');
+  const userRows = document.getElementById('userRows');
+
+  auth.onAuthStateChanged(function (user) {
+    if (!user) { window.location.replace('index.html'); return; }
+    if (user.email !== ADMIN_EMAIL) {
+      statusText.textContent = 'Not authorized.';
+      return;
+    }
+    statusText.textContent = 'Signed in as admin (' + user.email + ')';
+    loadUsers();
+  });
+
+  function loadUsers() {
+    db.collection('users').get().then(function (snap) {
+      userRows.innerHTML = '';
+      snap.forEach(function (docSnap) {
+        const d = docSnap.data();
+        const tr = document.createElement('tr');
+        const tdEmail = document.createElement('td'); tdEmail.textContent = d.email || '(no email)';
+        const tdStatus = document.createElement('td'); tdStatus.textContent = d.approved ? 'Approved' : 'Pending';
+        const tdAction = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.textContent = d.approved ? 'Revoke' : 'Approve';
+        btn.addEventListener('click', function () {
+          btn.disabled = true;
+          db.collection('users').doc(docSnap.id).update({ approved: !d.approved }).then(loadUsers);
+        });
+        tdAction.appendChild(btn);
+        tr.appendChild(tdEmail); tr.appendChild(tdStatus); tr.appendChild(tdAction);
+        userRows.appendChild(tr);
+      });
+      userTable.style.display = 'table';
+    }).catch(function (err) {
+      statusText.textContent = 'Error loading users: ' + err.message;
+    });
+  }
+}
+</script>
+</body>
+</html>

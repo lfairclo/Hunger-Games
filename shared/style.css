@@ -1,0 +1,38 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; min-height: 100%;
+  background: #0b0b12; color: #f2f2f2;
+  font-family: 'Courier New', monospace;
+}
+.wrap {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px; padding: 20px; text-align: center;
+}
+h1 { letter-spacing: 2px; text-shadow: 0 0 10px #ff5566; margin-bottom: 4px; }
+p.desc { color: #ccc; max-width: 480px; line-height: 1.5; }
+.card {
+  background: #16161f; border: 2px solid #444; border-radius: 8px;
+  padding: 28px 32px; max-width: 480px; width: 100%;
+}
+button, a.btn {
+  background: #16161f; border: 2px solid #666; color: #f2f2f2;
+  padding: 10px 18px; font-family: inherit; font-size: 15px;
+  cursor: pointer; border-radius: 4px; text-decoration: none; display: inline-block;
+}
+button:hover, a.btn:hover { border-color: #ffd24d; background: #26263a; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.subtle { color: #888; font-size: 12px; }
+.error { color: #ff5566; min-height: 18px; }
+#escReminder {
+  position: fixed; bottom: 6px; left: 0; right: 0; text-align: center;
+  color: #ffd24d; font-size: 13px; text-shadow: 0 0 4px #000; pointer-events: none;
+}
+.game-list { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 420px; }
+.game-btn {
+  background: #1c1c28; border: 2px solid #555; border-radius: 6px;
+  padding: 14px; font-size: 16px; color: #ffd24d;
+}
+.game-btn:hover { border-color: #ffd24d; background: #26263a; }
+table { border-collapse: collapse; width: 100%; max-width: 560px; }
+th, td { border: 1px solid #444; padding: 8px 10px; font-size: 13px; text-align: left; }
+th { color: #ffd24d; }
